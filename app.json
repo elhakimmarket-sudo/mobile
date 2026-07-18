@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Elhakim HR System",
+    "slug": "elhakim-hr-system",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#111111"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.employeeapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "التطبيق يحتاج الكاميرا لالتقاط صورة إثبات الحضور والانصراف",
+        "NSLocationWhenInUseUsageDescription": "التطبيق يحتاج موقعك لتسجيل الحضور والانصراف من داخل مقر العمل"
+      }
+    },
+    "android": {
+      "package": "com.yourcompany.employeeapp",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "التطبيق يحتاج الكاميرا لتسجيل حضورك وانصرافك"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "التطبيق يحتاج موقعك لتسجيل الحضور من داخل مقر العمل"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "70912059-ce29-44e4-866d-973db18abd74"
+      }
+    }
+  }
+}
