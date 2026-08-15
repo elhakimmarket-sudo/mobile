@@ -101,8 +101,15 @@ export default function DashboardScreen() {
   const presentDays = records.filter((r) => r.status === 'present' || r.status === 'late').length;
 
   // ملحوظة: ده رقم تقريبي (أيام الشهر اللي عدت لحد النهاردة ناقص أيام الحضور وأيام الإجازة)
-  // لأن السيرفر مبيسجلش سجل "غياب" صريح لكل يوم، فبنحسبه تقديريًا على الجهاز
-  const daysPassedInMonth = now.getDate();
+  // لأن السيرفر مبيسجلش سجل "غياب" صريح لكل يوم، فبنحسبه تقديريًا على الجهاز.
+  // بنبدأ العد من أول يوم شغل فعلي للموظف (joinDate) لو وقع في الشهر الحالي - عشان الأيام
+  // اللي قبل ما يتعين مايتحسبوش غياب بدون إذن
+  const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const todayStr = `${monthPrefix}-${String(now.getDate()).padStart(2, '0')}`;
+  const monthStartStr = `${monthPrefix}-01`;
+  const joinDateStr = profile?.joinDate ? String(profile.joinDate).split('T')[0] : null;
+  const effectiveStartStr = joinDateStr && joinDateStr > monthStartStr ? joinDateStr : monthStartStr;
+  const daysPassedInMonth = Math.floor((new Date(todayStr) - new Date(effectiveStartStr)) / 86400000) + 1;
   const absentDays = Math.max(0, daysPassedInMonth - presentDays - leaveDays);
 
   return (
