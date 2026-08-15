@@ -13,6 +13,7 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
 
 // المراحل: select (اختيار حضور/انصراف) -> camera (التقاط صورة) -> password (تأكيد كلمة مرور الموظف)
@@ -138,24 +139,30 @@ export default function KioskConfirmScreen({ route, navigation }) {
         <View style={styles.selectCard}>
           <Text style={styles.employeeName}>{employee.name}</Text>
           <Text style={styles.employeeMeta}>{employee.position || ''}</Text>
-          <Text style={styles.shiftText}>
-            {employee.shift ? `⏱️ ${employee.shift.name} (${employee.shift.startTime} - ${employee.shift.endTime})` : 'بدون وردية محددة'}
-          </Text>
+          <View style={styles.shiftRow}>
+            {!!employee.shift && <Ionicons name="time-outline" size={14} color="#2F80ED" />}
+            <Text style={styles.shiftText}>
+              {employee.shift ? `${employee.shift.name} (${employee.shift.startTime} - ${employee.shift.endTime})` : 'بدون وردية محددة'}
+            </Text>
+          </View>
         </View>
 
         {statusLoading ? (
           <ActivityIndicator size="large" color="#2F80ED" style={{ marginVertical: 20 }} />
         ) : alreadyDoneBoth ? (
           <View style={styles.doneCard}>
-            <Text style={styles.doneCardText}>✅ سجّلت حضورك وانصرافك النهاردة بالفعل</Text>
+            <Ionicons name="checkmark-circle-outline" size={20} color="#1e7e34" />
+            <Text style={styles.doneCardText}>سجّلت حضورك وانصرافك النهاردة بالفعل</Text>
           </View>
         ) : shouldCheckOut ? (
           <TouchableOpacity style={styles.checkOutButton} onPress={() => startFlow('check-out')}>
-            <Text style={styles.actionButtonText}>🚪 تسجيل انصراف</Text>
+            <Ionicons name="log-out-outline" size={18} color="#fff" />
+            <Text style={styles.actionButtonText}>تسجيل انصراف</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.checkInButton} onPress={() => startFlow('check-in')}>
-            <Text style={styles.actionButtonText}>✅ تسجيل حضور</Text>
+            <Ionicons name="log-in-outline" size={18} color="#fff" />
+            <Text style={styles.actionButtonText}>تسجيل حضور</Text>
           </TouchableOpacity>
         )}
 
@@ -185,10 +192,10 @@ export default function KioskConfirmScreen({ route, navigation }) {
     return (
       <View style={styles.cameraContainer}>
         <Text style={styles.cameraHeader}>
-          {mode === 'check-in' ? '📍 تسجيل حضور' : '📍 تسجيل انصراف'} - {employee.name}
+          {mode === 'check-in' ? 'تسجيل حضور' : 'تسجيل انصراف'} - {employee.name}
         </Text>
-        {locating && <Text style={styles.locationText}>⏳ جاري تحديد الموقع...</Text>}
-        {!locating && location && <Text style={styles.locationText}>✅ تم تحديد الموقع</Text>}
+        {locating && <Text style={styles.locationText}>جاري تحديد الموقع...</Text>}
+        {!locating && location && <Text style={styles.locationText}>تم تحديد الموقع</Text>}
 
         {!photo ? (
           <CameraView ref={cameraRef} style={styles.camera} facing="front" />
@@ -199,7 +206,8 @@ export default function KioskConfirmScreen({ route, navigation }) {
         <View style={[styles.cameraActions, { paddingBottom: 16 + insets.bottom }]}>
           {!photo ? (
             <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
-              <Text style={styles.actionButtonText}>📸 التقاط صورة</Text>
+              <Ionicons name="camera-outline" size={18} color="#fff" style={{ marginLeft: 8 }} />
+              <Text style={styles.actionButtonText}>التقاط صورة</Text>
             </TouchableOpacity>
           ) : (
             <>
@@ -244,10 +252,20 @@ const styles = StyleSheet.create({
   selectCard: { backgroundColor: '#fff', borderRadius: 14, padding: 20, marginBottom: 30, elevation: 1 },
   employeeName: { fontSize: 24, fontWeight: 'bold', color: '#111111', textAlign: 'center' },
   employeeMeta: { fontSize: 14, color: '#777', textAlign: 'center', marginTop: 4 },
-  shiftText: { fontSize: 15, color: '#2F80ED', textAlign: 'center', marginTop: 12, fontWeight: '600' },
-  checkInButton: { backgroundColor: '#2E7D32', padding: 18, borderRadius: 12, alignItems: 'center', marginBottom: 12 },
-  checkOutButton: { backgroundColor: '#B71C1C', padding: 18, borderRadius: 12, alignItems: 'center' },
-  doneCard: { backgroundColor: '#e6f4ea', borderRadius: 12, padding: 20, alignItems: 'center' },
+  shiftRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 },
+  shiftText: { fontSize: 15, color: '#2F80ED', textAlign: 'center', fontWeight: '600' },
+  checkInButton: {
+    backgroundColor: '#2E7D32', padding: 18, borderRadius: 12, alignItems: 'center', marginBottom: 12,
+    flexDirection: 'row-reverse', justifyContent: 'center', gap: 8
+  },
+  checkOutButton: {
+    backgroundColor: '#B71C1C', padding: 18, borderRadius: 12, alignItems: 'center',
+    flexDirection: 'row-reverse', justifyContent: 'center', gap: 8
+  },
+  doneCard: {
+    backgroundColor: '#e6f4ea', borderRadius: 12, padding: 20, alignItems: 'center',
+    flexDirection: 'row-reverse', justifyContent: 'center', gap: 8
+  },
   doneCardText: { color: '#1e7e34', fontSize: 16, fontWeight: 'bold', textAlign: 'center' },
   actionButtonText: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
   backLink: { marginTop: 24, alignItems: 'center' },
@@ -263,7 +281,10 @@ const styles = StyleSheet.create({
   locationText: { color: '#fff', textAlign: 'center', paddingBottom: 8, backgroundColor: '#111111' },
   camera: { flex: 1 },
   cameraActions: { padding: 16, backgroundColor: '#111' },
-  captureButton: { backgroundColor: '#111111', padding: 16, borderRadius: 10, alignItems: 'center' },
+  captureButton: {
+    backgroundColor: '#111111', padding: 16, borderRadius: 10, alignItems: 'center',
+    flexDirection: 'row-reverse', justifyContent: 'center'
+  },
   confirmButton: { backgroundColor: '#2E7D32', padding: 16, borderRadius: 10, alignItems: 'center', marginTop: 10 },
   secondaryButton: { backgroundColor: '#555', padding: 14, borderRadius: 10, alignItems: 'center' },
   secondaryButtonText: { color: '#fff', fontSize: 15 },

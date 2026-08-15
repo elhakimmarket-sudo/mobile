@@ -12,6 +12,7 @@ import {
   Platform,
   Image
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
 // رسائل ترحيب بتتغير عشوائيًا في كل مرة يسجل فيها الموظف دخول
@@ -101,9 +102,14 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin} disabled={bioLoading}>
-            {bioLoading
-              ? <ActivityIndicator color="#2F80ED" />
-              : <Text style={styles.biometricBtnText}>🔒 تسجيل بالبصمة</Text>}
+            {bioLoading ? (
+              <ActivityIndicator color="#2F80ED" />
+            ) : (
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="finger-print-outline" size={16} color="#2F80ED" />
+                <Text style={styles.biometricBtnText}>تسجيل بالبصمة</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -118,7 +124,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 28,
-    elevation: 6
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8
   },
   brandMark: {
     width: 64,

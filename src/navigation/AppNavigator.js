@@ -22,6 +22,7 @@ import EditProfilePhotoScreen from '../screens/EditProfilePhotoScreen';
 import KioskHomeScreen from '../screens/KioskHomeScreen';
 import KioskSearchScreen from '../screens/KioskSearchScreen';
 import KioskConfirmScreen from '../screens/KioskConfirmScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -61,6 +62,7 @@ function MenuStackNavigator() {
 function MainTabs() {
   return (
     <Tab.Navigator
+      initialRouteName="تسجيل"
       screenOptions={{
         headerTitleAlign: 'center',
         tabBarActiveTintColor: '#2F80ED',
@@ -123,6 +125,11 @@ export default function AppNavigator() {
               name="CheckIn"
               component={CheckInScreen}
               options={{ headerShown: true, title: 'تسجيل الحضور/الانصراف' }}
+            />
+            <Stack.Screen
+              name="Notifications"
+              component={NotificationsScreen}
+              options={{ headerShown: true, title: 'الإشعارات', headerTitleAlign: 'center' }}
             />
           </>
         )}

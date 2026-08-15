@@ -11,6 +11,7 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -104,7 +105,10 @@ export default function EditProfilePhotoScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>📷 تحديث الصورة الشخصية</Text>
+      <View style={styles.headerRow}>
+        <Ionicons name="camera-outline" size={17} color="#fff" />
+        <Text style={styles.header}>تحديث الصورة الشخصية</Text>
+      </View>
 
       {!photo ? (
         <CameraView ref={cameraRef} style={styles.camera} facing="front" />
@@ -116,10 +120,12 @@ export default function EditProfilePhotoScreen({ navigation }) {
         {!photo ? (
           <>
             <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
-              <Text style={styles.buttonText}>📸 التقاط صورة</Text>
+              <Ionicons name="camera-outline" size={17} color="#fff" style={{ marginLeft: 8 }} />
+              <Text style={styles.buttonText}>التقاط صورة</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={pickFromGallery}>
-              <Text style={styles.secondaryButtonText}>🖼️ اختيار من المعرض</Text>
+              <Ionicons name="images-outline" size={16} color="#fff" style={{ marginLeft: 8 }} />
+              <Text style={styles.secondaryButtonText}>اختيار من المعرض</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -144,21 +150,20 @@ export default function EditProfilePhotoScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  header: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    paddingVertical: 14,
-    backgroundColor: '#111111'
+  headerRow: {
+    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 14, backgroundColor: '#111111'
   },
+  header: { color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
   camera: { flex: 1 },
   actions: { padding: 16, backgroundColor: '#111' },
   captureButton: {
     backgroundColor: '#111111',
     padding: 16,
     borderRadius: 10,
-    alignItems: 'center'
+    alignItems: 'center',
+    flexDirection: 'row-reverse',
+    justifyContent: 'center'
   },
   button: {
     backgroundColor: '#2F80ED',
@@ -171,7 +176,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#555',
     padding: 14,
     borderRadius: 10,
-    alignItems: 'center'
+    alignItems: 'center',
+    flexDirection: 'row-reverse',
+    justifyContent: 'center'
   },
   secondaryButtonText: { color: '#fff', fontSize: 15 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },

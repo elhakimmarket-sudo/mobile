@@ -1,9 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ScrollView, Alert, Vibration } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { scheduleBreakEndNotification, cancelBreakNotification } from '../services/breakNotifications';
+import { COLORS, CARD_SHADOW } from '../theme/colors';
 
 // نمط الاهتزاز وقت الإنذار - بيتكرر لحد ما يتلغي يدويًا بـ Vibration.cancel()
 const ALARM_VIBRATION_PATTERN = [500, 1000, 500, 1000];
@@ -17,6 +19,7 @@ export default function HomeScreen({ navigation }) {
   const [breakEndTime, setBreakEndTime] = useState(null); // Date
   const [remainingSeconds, setRemainingSeconds] = useState(null);
   const [alarmRinging, setAlarmRinging] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // بتتحدث كل ثانية - بتُستخدم لعرض الساعة/التاريخ الحاليين ولحساب مدة العمل الحية
   const [now, setNow] = useState(new Date());
@@ -27,17 +30,19 @@ export default function HomeScreen({ navigation }) {
   const fetchToday = async () => {
     try {
       const nowDate = new Date();
-      const [attendanceRes, meRes] = await Promise.all([
+      const [attendanceRes, meRes, notificationsRes] = await Promise.all([
         api.get('/attendance/my', { params: { month: nowDate.getMonth() + 1, year: nowDate.getFullYear() } }),
-        api.get('/auth/me')
+        api.get('/auth/me'),
+        api.get('/notifications/my').catch(() => ({ data: { unreadCount: 0 } }))
       ]);
+      setUnreadCount(notificationsRes.data?.unreadCount || 0);
 
       // بتوقيت مصر (مش UTC) - عشان يتطابق مع تاريخ سجل الحضور المحسوب في الباك اند بالظبط
       const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(nowDate);
       const todayRecord = attendanceRes.data.find((r) => r.date === todayStr);
       setToday(todayRecord || null);
 
-      const allowedMinutes = meRes.data?.allowedBreakMinutes ?? 60;
+      const allowedMinutes = meRes.data?.allowedBreakMinutes || 60;
       setAllowedBreakMinutes(allowedMinutes);
 
       // لو فيه استراحة شغالة بالفعل (مثلاً المستخدم قفل وفتح التطبيق تاني)، أعد بناء العداد من بيانات السيرفر
@@ -121,7 +126,7 @@ export default function HomeScreen({ navigation }) {
       const { data } = await api.post(`/attendance/break/${action}`);
 
       if (action === 'start') {
-        const minutes = data.allowedBreakMinutes ?? allowedBreakMinutes;
+        const minutes = data.allowedBreakMinutes || allowedBreakMinutes || 60;
         const startTime = data.breakStartTime ? new Date(data.breakStartTime) : new Date();
         const endTime = new Date(startTime.getTime() + minutes * 60000);
         setBreakEndTime(endTime);
@@ -182,9 +187,22 @@ export default function HomeScreen({ navigation }) {
       contentContainerStyle={{ padding: 16 }}
     >
       <View style={styles.headerBlock}>
-        <Text style={styles.headerTitle}>أهلاً، {user?.name}</Text>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity style={styles.bellBtn} onPress={() => navigation.navigate('Notifications')}>
+            <Ionicons name="notifications-outline" size={18} color={COLORS.textMuted} />
+            {unreadCount > 0 && (
+              <View style={styles.bellDot}>
+                <Text style={styles.bellDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>أهلاً، {user?.name}</Text>
+        </View>
         <View style={styles.dateTimeCard}>
-          <Text style={styles.dateTimeDate}>{currentDateStr}</Text>
+          <View style={styles.dateRow}>
+            <Ionicons name="calendar-outline" size={12} color="#cfe0fd" />
+            <Text style={styles.dateTimeDate}>{currentDateStr}</Text>
+          </View>
           <View style={styles.clockRow}>
             <Text style={styles.clockValue}>{currentClock.time}</Text>
             <Text style={styles.clockPeriod}>{currentClock.period}</Text>
@@ -196,8 +214,8 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.statusTitle}>حالة اليوم</Text>
         <View style={styles.statusItemsRow}>
           <View style={styles.statusItem}>
-            <View style={[styles.statusIconWrap, { backgroundColor: '#e6f4ea' }]}>
-              <Text style={styles.statusIcon}>✅</Text>
+            <View style={[styles.statusIconWrap, { backgroundColor: hasCheckedIn ? COLORS.successBg : COLORS.grayLight }]}>
+              <Ionicons name="log-in-outline" size={17} color={hasCheckedIn ? COLORS.successText : COLORS.gray} />
             </View>
             <Text style={styles.statusItemLabel}>الحضور</Text>
             <Text style={styles.statusItemValue} numberOfLines={1}>
@@ -205,8 +223,8 @@ export default function HomeScreen({ navigation }) {
             </Text>
           </View>
           <View style={styles.statusItem}>
-            <View style={[styles.statusIconWrap, { backgroundColor: '#fdecea' }]}>
-              <Text style={styles.statusIcon}>🚪</Text>
+            <View style={[styles.statusIconWrap, { backgroundColor: hasCheckedOut ? COLORS.dangerBg : COLORS.grayLight }]}>
+              <Ionicons name="log-out-outline" size={17} color={hasCheckedOut ? COLORS.dangerText : COLORS.gray} />
             </View>
             <Text style={styles.statusItemLabel}>الانصراف</Text>
             <Text style={styles.statusItemValue} numberOfLines={1}>
@@ -214,8 +232,8 @@ export default function HomeScreen({ navigation }) {
             </Text>
           </View>
           <View style={styles.statusItem}>
-            <View style={[styles.statusIconWrap, { backgroundColor: onBreak ? '#fff3e0' : '#f0f0f0' }]}>
-              <Text style={styles.statusIcon}>☕</Text>
+            <View style={[styles.statusIconWrap, { backgroundColor: onBreak ? COLORS.warningBg : COLORS.grayLight }]}>
+              <Ionicons name="cafe-outline" size={17} color={onBreak ? COLORS.warningText : COLORS.gray} />
             </View>
             <Text style={styles.statusItemLabel}>الراحة</Text>
             <Text style={styles.statusItemValue} numberOfLines={1}>
@@ -227,7 +245,10 @@ export default function HomeScreen({ navigation }) {
 
       {hasCheckedIn && !hasCheckedOut && (
         <View style={styles.workTimerCard}>
-          <Text style={styles.workTimerLabel}>⏱️ مدة العمل حتى الآن</Text>
+          <View style={styles.workTimerLabelRow}>
+            <Ionicons name="time-outline" size={13} color="#e8f0fe" />
+            <Text style={styles.workTimerLabel}>مدة العمل حتى الآن</Text>
+          </View>
           <Text style={styles.workTimerValue}>{getWorkDuration()}</Text>
         </View>
       )}
@@ -236,7 +257,8 @@ export default function HomeScreen({ navigation }) {
         <View style={[styles.breakTimerCard, alarmRinging && styles.breakTimerCardAlarm]}>
           {alarmRinging ? (
             <>
-              <Text style={styles.alarmTitle}>⏰ انتهت فترة الراحة!</Text>
+              <Ionicons name="alarm-outline" size={26} color="#fff" style={{ marginBottom: 6 }} />
+              <Text style={styles.alarmTitle}>انتهت فترة الراحة</Text>
               <Text style={styles.alarmSubtitle}>من فضلك ارجع للعمل وأنهِ الراحة</Text>
             </>
           ) : (
@@ -250,44 +272,55 @@ export default function HomeScreen({ navigation }) {
 
       {!hasCheckedIn && (
         <TouchableOpacity
-          style={styles.mainButton}
+          style={styles.primaryButton}
           onPress={() => navigation.navigate('CheckIn', { mode: 'check-in' })}
         >
-          <Text style={styles.mainButtonIcon}>✅</Text>
-          <Text style={styles.mainButtonText} numberOfLines={1}>تسجيل الحضور</Text>
+          <Ionicons name="log-in-outline" size={18} color="#fff" />
+          <Text style={styles.primaryButtonText} numberOfLines={1}>تسجيل الحضور</Text>
         </TouchableOpacity>
       )}
 
       {hasCheckedIn && !hasCheckedOut && (
         <>
           {!onBreak ? (
-            <TouchableOpacity style={styles.breakButton} onPress={() => handleBreak('start')}>
-              <Text style={styles.mainButtonIcon}>☕</Text>
-              <Text style={styles.mainButtonText} numberOfLines={1}>بدء الراحة</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => navigation.navigate('CheckIn', { mode: 'check-out' })}
+              >
+                <Ionicons name="log-out-outline" size={18} color="#fff" />
+                <Text style={styles.primaryButtonText} numberOfLines={1}>تسجيل الانصراف</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => handleBreak('start')}>
+                <Ionicons name="cafe-outline" size={16} color={COLORS.black} />
+                <Text style={styles.secondaryButtonText} numberOfLines={1}>بدء الراحة</Text>
+              </TouchableOpacity>
+            </>
           ) : (
-            <TouchableOpacity
-              style={[styles.breakButton, alarmRinging && styles.breakButtonAlarm]}
-              onPress={() => handleBreak('end')}
-            >
-              <Text style={styles.mainButtonIcon}>🔙</Text>
-              <Text style={styles.mainButtonText} numberOfLines={1}>إنهاء الراحة</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={[styles.primaryButton, alarmRinging && styles.primaryButtonAlarm]}
+                onPress={() => handleBreak('end')}
+              >
+                <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                <Text style={styles.primaryButtonText} numberOfLines={1}>إنهاء الراحة</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => navigation.navigate('CheckIn', { mode: 'check-out' })}
+              >
+                <Ionicons name="log-out-outline" size={16} color={COLORS.black} />
+                <Text style={styles.secondaryButtonText} numberOfLines={1}>تسجيل الانصراف</Text>
+              </TouchableOpacity>
+            </>
           )}
-
-          <TouchableOpacity
-            style={styles.checkoutButton}
-            onPress={() => navigation.navigate('CheckIn', { mode: 'check-out' })}
-          >
-            <Text style={styles.mainButtonIcon}>🚪</Text>
-            <Text style={styles.mainButtonText} numberOfLines={1}>تسجيل الانصراف</Text>
-          </TouchableOpacity>
         </>
       )}
 
       {hasCheckedOut && (
         <View style={styles.doneCard}>
-          <Text style={styles.doneText}>🎉 تم تسجيل يوم العمل بنجاح، أراك غدًا!</Text>
+          <Ionicons name="checkmark-done-circle-outline" size={22} color={COLORS.successText} />
+          <Text style={styles.doneText}>تم تسجيل يوم العمل بنجاح، أراك غدًا</Text>
         </View>
       )}
     </ScrollView>
@@ -295,96 +328,104 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  container: { flex: 1, backgroundColor: COLORS.bg },
 
   headerBlock: { alignItems: 'flex-end', marginBottom: 16 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#111111', textAlign: 'right', marginBottom: 10 },
+  headerTopRow: {
+    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
+    width: '100%', marginBottom: 10
+  },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.black, textAlign: 'right' },
+  bellBtn: {
+    width: 34, height: 34, borderRadius: 17, backgroundColor: COLORS.white,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border
+  },
+  bellDot: {
+    position: 'absolute', top: -4, left: -4, minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: COLORS.dangerText, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3
+  },
+  bellDotText: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
   dateTimeCard: {
-    backgroundColor: '#2F80ED', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 18,
+    backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 18,
     width: '100%', alignItems: 'center'
   },
-  dateTimeDate: { color: '#e8f0fe', fontSize: 13, marginBottom: 4 },
+  dateRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginBottom: 4 },
+  dateTimeDate: { color: '#e8f0fe', fontSize: 13 },
   clockRow: { flexDirection: 'row-reverse', alignItems: 'flex-end', gap: 4 },
   clockValue: { color: '#fff', fontSize: 32, fontWeight: 'bold', letterSpacing: 1 },
   clockPeriod: { color: '#fff', fontSize: 15, marginBottom: 4 },
 
   statusCard: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
-    elevation: 2
+    ...CARD_SHADOW
   },
-  statusTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 14, textAlign: 'right', color: '#111111' },
+  statusTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 14, textAlign: 'right', color: COLORS.black },
   statusItemsRow: { flexDirection: 'row-reverse', justifyContent: 'space-between' },
   statusItem: { alignItems: 'center', flex: 1 },
   statusIconWrap: {
     width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 6
   },
-  statusIcon: { fontSize: 18 },
-  statusItemLabel: { fontSize: 12, color: '#999', marginBottom: 3 },
-  statusItemValue: { fontSize: 13, fontWeight: '600', color: '#111111' },
+  statusItemLabel: { fontSize: 12, color: COLORS.gray, marginBottom: 3 },
+  statusItemValue: { fontSize: 13, fontWeight: '600', color: COLORS.black },
 
   workTimerCard: {
-    backgroundColor: '#2F80ED',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     padding: 18,
     marginBottom: 16,
     alignItems: 'center'
   },
-  workTimerLabel: { color: '#e8f0fe', fontSize: 13, marginBottom: 6 },
+  workTimerLabelRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginBottom: 6 },
+  workTimerLabel: { color: '#e8f0fe', fontSize: 13 },
   workTimerValue: { color: '#fff', fontSize: 30, fontWeight: 'bold' },
 
   breakTimerCard: {
-    backgroundColor: '#111111',
+    backgroundColor: COLORS.black,
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
     alignItems: 'center'
   },
   breakTimerCardAlarm: {
-    backgroundColor: '#B71C1C'
+    backgroundColor: COLORS.dangerText
   },
   timerLabel: { color: '#ccc', fontSize: 13, marginBottom: 6 },
   timerValue: { color: '#fff', fontSize: 36, fontWeight: 'bold' },
   alarmTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 6 },
   alarmSubtitle: { color: '#fff', fontSize: 14 },
 
-  mainButton: {
-    backgroundColor: '#2F80ED',
+  primaryButton: {
+    backgroundColor: COLORS.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     flexDirection: 'row-reverse',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 12
+    marginBottom: 10
   },
-  breakButton: {
-    backgroundColor: '#2b2b2b',
-    padding: 16,
+  primaryButtonAlarm: {
+    backgroundColor: COLORS.dangerText
+  },
+  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+
+  secondaryButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 13,
     borderRadius: 12,
     alignItems: 'center',
     flexDirection: 'row-reverse',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 12
+    marginBottom: 10
   },
-  breakButtonAlarm: {
-    backgroundColor: '#B71C1C'
-  },
-  checkoutButton: {
-    backgroundColor: '#178a48',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    flexDirection: 'row-reverse',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 12
-  },
-  mainButtonIcon: { fontSize: 17 },
-  mainButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  doneCard: { padding: 20, alignItems: 'center' },
-  doneText: { fontSize: 16, color: '#178a48', textAlign: 'center' }
+  secondaryButtonText: { color: COLORS.black, fontSize: 14, fontWeight: '600' },
+
+  doneCard: { padding: 20, alignItems: 'center', gap: 6 },
+  doneText: { fontSize: 15, color: COLORS.successText, textAlign: 'center' }
 });

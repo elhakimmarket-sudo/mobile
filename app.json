@@ -54,7 +54,13 @@
           "locationAlwaysAndWhenInUsePermission": "التطبيق يحتاج موقعك لتسجيل الحضور من داخل مقر العمل"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "sounds": ["./assets/sounds/break-alarm.wav.wav"]
+        }
+      ]
     ],
     "extra": {
       "eas": {

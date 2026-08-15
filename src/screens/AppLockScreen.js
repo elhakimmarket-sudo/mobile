@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
 export default function AppLockScreen() {
@@ -44,7 +45,14 @@ export default function AppLockScreen() {
       {!showPasswordMode ? (
         <>
           <TouchableOpacity style={styles.unlockBtn} onPress={tryUnlock} disabled={authenticating}>
-            <Text style={styles.unlockBtnText}>{authenticating ? 'جاري التحقق...' : '🔓 فتح التطبيق'}</Text>
+            {authenticating ? (
+              <Text style={styles.unlockBtnText}>جاري التحقق...</Text>
+            ) : (
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="lock-open-outline" size={16} color="#fff" />
+                <Text style={styles.unlockBtnText}>فتح التطبيق</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setShowPasswordMode(true)}>

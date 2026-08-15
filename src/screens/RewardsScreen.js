@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
+import { CARD_SHADOW } from '../theme/colors';
 
 export default function RewardsScreen() {
   const [records, setRecords] = useState([]);
@@ -51,7 +52,7 @@ export default function RewardsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F7FA' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, elevation: 1 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, ...CARD_SHADOW },
   cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   amountText: { fontSize: 16, fontWeight: 'bold', color: '#1e7e34' },
   monthText: { fontSize: 12, color: '#888' },

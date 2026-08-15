@@ -4,6 +4,7 @@ import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import * as Updates from 'expo-updates';
 import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import { setupBreakNotificationChannel } from './src/services/breakNotifications';
 
 export default function App() {
   // بنستنى نتأكد فيه تحديث جديد ولا لأ قبل ما نفتح التطبيق العادي - عشان لو فيه تحديث، نحمّله ونعيد الفتح تلقائي
@@ -12,6 +13,9 @@ export default function App() {
 
   useEffect(() => {
     checkForUpdate();
+    // بينشئ قناة تنبيه انتهاء الراحة على أندرويد (صوت المنبه + الاهتزاز + الأهمية القصوى) -
+    // لازم تتعمل مرة واحدة بدري عند فتح التطبيق قبل أي محاولة جدولة تنبيه
+    setupBreakNotificationChannel();
   }, []);
 
   const checkForUpdate = async () => {

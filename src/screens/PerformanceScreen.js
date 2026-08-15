@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
+import { COLORS, CARD_SHADOW } from '../theme/colors';
 
 const arabicMonthShort = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 
@@ -51,7 +53,16 @@ const ReviewCard = ({ review }) => (
     {Object.keys(scoreLabels).map((key) => (
       <View key={key} style={styles.reviewScoreRow}>
         <Text style={styles.reviewScoreLabel}>{scoreLabels[key]}</Text>
-        <Text style={styles.reviewScoreValue}>{'⭐'.repeat(review.scores[key])}</Text>
+        <View style={{ flexDirection: 'row-reverse', gap: 2 }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <Ionicons
+              key={n}
+              name={n <= review.scores[key] ? 'star' : 'star-outline'}
+              size={13}
+              color="#F5A623"
+            />
+          ))}
+        </View>
       </View>
     ))}
     {!!review.comments && <Text style={styles.reviewComments}>{review.comments}</Text>}
@@ -154,11 +165,11 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F7FA' },
 
   summaryRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 16 },
-  summaryBox: { flex: 1, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginHorizontal: 3, elevation: 1 },
+  summaryBox: { flex: 1, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginHorizontal: 3, ...CARD_SHADOW },
   summaryValue: { fontSize: 20, fontWeight: 'bold', color: '#111111' },
   summaryLabel: { fontSize: 11, color: '#777', marginTop: 4, textAlign: 'center' },
 
-  chartCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 14, elevation: 1 },
+  chartCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 14, ...CARD_SHADOW },
   chartTitle: { fontSize: 14, fontWeight: '600', color: '#111111', marginBottom: 14, textAlign: 'right' },
   chartRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-end', height: 120 },
   barColumn: { flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' },
@@ -169,7 +180,7 @@ const styles = StyleSheet.create({
 
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#111111', marginTop: 8, marginBottom: 10, textAlign: 'right' },
   emptyReviews: { textAlign: 'center', color: '#999', paddingVertical: 20 },
-  reviewCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, elevation: 1 },
+  reviewCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, ...CARD_SHADOW },
   reviewHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   reviewPeriod: { fontSize: 15, fontWeight: 'bold', color: '#111111' },
   reviewOverall: { fontSize: 15, fontWeight: 'bold', color: '#2F80ED' },

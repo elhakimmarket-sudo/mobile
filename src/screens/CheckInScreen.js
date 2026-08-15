@@ -12,6 +12,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -153,7 +154,8 @@ export default function CheckInScreen({ route, navigation }) {
       <View style={[styles.actions, { paddingBottom: 16 + insets.bottom }]}>
         {!photo ? (
           <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
-            <Text style={styles.buttonText}>📸 التقاط صورة</Text>
+            <Ionicons name="camera-outline" size={18} color="#fff" style={{ marginLeft: 8 }} />
+            <Text style={styles.buttonText}>التقاط صورة</Text>
           </TouchableOpacity>
         ) : (
           <>
@@ -201,7 +203,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#111111',
     padding: 16,
     borderRadius: 10,
-    alignItems: 'center'
+    alignItems: 'center',
+    flexDirection: 'row-reverse',
+    justifyContent: 'center'
   },
   button: {
     backgroundColor: '#2E7D32',

@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
+import { CARD_SHADOW } from '../theme/colors';
 
 export default function PenaltiesScreen() {
   const [records, setRecords] = useState([]);
@@ -34,7 +36,12 @@ export default function PenaltiesScreen() {
       data={records}
       keyExtractor={(item) => item._id}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      ListEmptyComponent={<Text style={styles.empty}>لا يوجد جزاءات مسجلة، الحمد لله 🎉</Text>}
+      ListEmptyComponent={
+        <View style={styles.emptyWrap}>
+          <Ionicons name="checkmark-done-circle-outline" size={30} color="#ccc" />
+          <Text style={styles.empty}>لا يوجد جزاءات مسجلة، الحمد لله</Text>
+        </View>
+      }
       contentContainerStyle={{ padding: 16 }}
       renderItem={({ item }) => (
         <View style={styles.card}>
@@ -51,10 +58,11 @@ export default function PenaltiesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F7FA' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, elevation: 1 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, ...CARD_SHADOW },
   cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   amountText: { fontSize: 16, fontWeight: 'bold', color: '#9c0c23' },
   monthText: { fontSize: 12, color: '#888' },
   reasonText: { fontSize: 13, color: '#555', textAlign: 'right' },
-  empty: { textAlign: 'center', color: '#888', marginTop: 40 }
+  emptyWrap: { alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: 10 },
+  empty: { textAlign: 'center', color: '#888' }
 });

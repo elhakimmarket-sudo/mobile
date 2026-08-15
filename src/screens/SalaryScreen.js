@@ -2,7 +2,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
+import { COLORS, CARD_SHADOW } from '../theme/colors';
 
 export default function SalaryScreen() {
   const insets = useSafeAreaInsets();
@@ -83,10 +85,10 @@ export default function SalaryScreen() {
       } else {
         const { penalties, lateness, loanInstallments, advances, total } = data.deductions;
         const rows = [
-          ...penalties.map((p) => ({ label: `⚖️ ${p.reason || 'جزاء'}`, value: p.amount })),
-          ...lateness.map((l) => ({ label: `⏰ تأخير ${l.date} (مرة ${l.occurrence})`, value: l.amount })),
-          ...loanInstallments.map((i) => ({ label: `💳 قسط قرض مستحق ${i.dueDate}`, value: i.amount })),
-          ...advances.map((a) => ({ label: `💰 سلفة${a.reason ? ' - ' + a.reason : ''}`, value: a.amount }))
+          ...penalties.map((p) => ({ label: p.reason || 'جزاء', value: p.amount })),
+          ...lateness.map((l) => ({ label: `تأخير ${l.date} (مرة ${l.occurrence})`, value: l.amount })),
+          ...loanInstallments.map((i) => ({ label: `قسط قرض مستحق ${i.dueDate}`, value: i.amount })),
+          ...advances.map((a) => ({ label: `سلفة${a.reason ? ' - ' + a.reason : ''}`, value: a.amount }))
         ];
         setBreakdownRows(rows);
         setBreakdownTotal(total);
@@ -109,8 +111,9 @@ export default function SalaryScreen() {
         style={styles.toggleMonthButton}
         onPress={() => setViewingPreviousMonth((v) => !v)}
       >
+        <Ionicons name={viewingPreviousMonth ? 'arrow-undo-outline' : 'calendar-outline'} size={13} color={COLORS.primary} />
         <Text style={styles.toggleMonthButtonText}>
-          {viewingPreviousMonth ? '🔙 عرض الشهر الحالي' : '📅 عرض الشهر السابق'}
+          {viewingPreviousMonth ? 'عرض الشهر الحالي' : 'عرض الشهر السابق'}
         </Text>
       </TouchableOpacity>
 
@@ -122,7 +125,10 @@ export default function SalaryScreen() {
 
       {salary && !salary.paid && (
         <View style={styles.card}>
-          <Text style={styles.emptyText}>⏳ لسه راتب الشهر ده ما اتصرفش، هتقدر تشوف تفاصيله بعد ما يتم الصرف</Text>
+          <View style={styles.pendingRow}>
+            <Ionicons name="hourglass-outline" size={15} color={COLORS.warningText} />
+            <Text style={[styles.emptyText, { flex: 1 }]}>لسه راتب الشهر ده ما اتصرفش، هتقدر تشوف تفاصيله بعد ما يتم الصرف</Text>
+          </View>
         </View>
       )}
 
@@ -147,9 +153,10 @@ export default function SalaryScreen() {
           />
           <View style={styles.divider} />
           <Row label="إجمالي الراتب" value={`${salary.netSalary} جنيه`} bold />
-          <Text style={styles.status}>
-            ✅ تم صرف الراتب
-          </Text>
+          <View style={styles.statusRow}>
+            <Ionicons name="checkmark-circle-outline" size={15} color={COLORS.successText} />
+            <Text style={styles.status}>تم صرف الراتب</Text>
+          </View>
         </View>
       )}
 
@@ -193,7 +200,7 @@ const Row = ({ label, value, negative, bold, onInfoPress }) => (
       <Text style={[styles.value, negative && styles.negative, bold && styles.bold]}>{value}</Text>
       {onInfoPress && (
         <TouchableOpacity onPress={onInfoPress} style={styles.infoButton}>
-          <Text style={styles.infoButtonText}>ⓘ</Text>
+          <Ionicons name="information-circle-outline" size={16} color="#999" />
         </TouchableOpacity>
       )}
     </View>
@@ -206,10 +213,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: 'bold', color: '#111111', textAlign: 'right', marginBottom: 16 },
   toggleMonthButton: {
     alignSelf: 'flex-end', backgroundColor: '#fff', borderRadius: 20,
-    paddingVertical: 8, paddingHorizontal: 16, marginBottom: 16, elevation: 1
+    paddingVertical: 8, paddingHorizontal: 16, marginBottom: 16,
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 6, ...CARD_SHADOW
   },
   toggleMonthButtonText: { fontSize: 13, color: '#2F80ED', fontWeight: '600' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, elevation: 2 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, ...CARD_SHADOW },
+  pendingRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  statusRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 },
   row: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
@@ -226,7 +236,7 @@ const styles = StyleSheet.create({
   negative: { color: '#B71C1C' },
   bold: { fontSize: 17, fontWeight: 'bold' },
   divider: { height: 1, backgroundColor: '#DDD', marginVertical: 8 },
-  status: { textAlign: 'center', marginTop: 14, fontSize: 15, color: '#555' },
+  status: { textAlign: 'center', fontSize: 15, color: '#555' },
   emptyText: { textAlign: 'center', color: '#777', fontSize: 15 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

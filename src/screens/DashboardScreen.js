@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { COLORS, CARD_SHADOW } from '../theme/colors';
 
 const initials = (name) => {
   if (!name) return '؟';
@@ -18,12 +20,12 @@ const statusLabels = {
   in_progress: 'جاري العمل'
 };
 
-const statusColors = {
-  present: { bg: '#e6f4ea', text: '#1e7e34' },
-  late: { bg: '#fff3e0', text: '#b46a00' },
-  absent: { bg: '#fdecea', text: '#9c0c23' },
-  on_leave: { bg: '#e8f0fe', text: '#1a56db' },
-  in_progress: { bg: '#e8f0fe', text: '#1a56db' }
+const statusMeta = {
+  present: { bg: COLORS.successBg, text: COLORS.successText, icon: 'checkmark-circle-outline' },
+  late: { bg: COLORS.warningBg, text: COLORS.warningText, icon: 'time-outline' },
+  absent: { bg: COLORS.dangerBg, text: COLORS.dangerText, icon: 'close-circle-outline' },
+  on_leave: { bg: COLORS.infoBg, text: COLORS.infoText, icon: 'sunny-outline' },
+  in_progress: { bg: COLORS.infoBg, text: COLORS.infoText, icon: 'ellipse-outline' }
 };
 
 const monthNames = [
@@ -140,16 +142,25 @@ export default function DashboardScreen() {
       <Text style={styles.monthLabel}>إحصائيات شهر {monthNames[now.getMonth()]} {now.getFullYear()}</Text>
 
       <View style={styles.statsRow}>
-        <View style={[styles.statCard, { backgroundColor: '#e6f4ea' }]}>
-          <Text style={[styles.statValue, { color: '#1e7e34' }]}>{presentDays}</Text>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconWrap, { backgroundColor: COLORS.successBg }]}>
+            <Ionicons name="calendar-outline" size={15} color={COLORS.successText} />
+          </View>
+          <Text style={[styles.statValue, { color: COLORS.successText }]}>{presentDays}</Text>
           <Text style={styles.statLabel}>يوم حضور</Text>
         </View>
-        <View style={[styles.statCard, { backgroundColor: '#fdecea' }]}>
-          <Text style={[styles.statValue, { color: '#9c0c23' }]}>{absentDays}</Text>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconWrap, { backgroundColor: COLORS.dangerBg }]}>
+            <Ionicons name="close-circle-outline" size={15} color={COLORS.dangerText} />
+          </View>
+          <Text style={[styles.statValue, { color: COLORS.dangerText }]}>{absentDays}</Text>
           <Text style={styles.statLabel}>يوم غياب</Text>
         </View>
-        <View style={[styles.statCard, { backgroundColor: '#fff3e0' }]}>
-          <Text style={[styles.statValue, { color: '#b46a00' }]}>{leaveDays}</Text>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconWrap, { backgroundColor: COLORS.warningBg }]}>
+            <Ionicons name="sunny-outline" size={15} color={COLORS.warningText} />
+          </View>
+          <Text style={[styles.statValue, { color: COLORS.warningText }]}>{leaveDays}</Text>
           <Text style={styles.statLabel}>يوم إجازة</Text>
         </View>
       </View>
@@ -157,12 +168,13 @@ export default function DashboardScreen() {
       <Text style={styles.sectionTitle}>سجل الحضور والانصراف</Text>
       {records.length === 0 && <Text style={styles.empty}>لا يوجد سجلات لهذا الشهر</Text>}
       {records.map((item) => {
-        const colors = statusColors[item.status] || statusColors.present;
+        const meta = statusMeta[item.status] || statusMeta.present;
         return (
           <View key={item._id} style={styles.card}>
             <View style={styles.cardHeader}>
-              <View style={[styles.statusPill, { backgroundColor: colors.bg }]}>
-                <Text style={[styles.statusPillText, { color: colors.text }]}>
+              <View style={[styles.statusPill, { backgroundColor: meta.bg }]}>
+                <Ionicons name={meta.icon} size={12} color={meta.text} />
+                <Text style={[styles.statusPillText, { color: meta.text }]}>
                   {statusLabels[item.status] || item.status}
                 </Text>
               </View>
@@ -171,14 +183,14 @@ export default function DashboardScreen() {
 
             <View style={styles.timesRow}>
               <View style={styles.timeBlock}>
-                <View style={[styles.timeDot, { backgroundColor: '#1e7e34' }]} />
+                <Ionicons name="log-in-outline" size={14} color={COLORS.successText} />
                 <View>
                   <Text style={styles.timeLabel}>حضور</Text>
                   <Text style={styles.timeValue}>{formatTime(item.checkIn?.time)}</Text>
                 </View>
               </View>
               <View style={styles.timeBlock}>
-                <View style={[styles.timeDot, { backgroundColor: '#9c0c23' }]} />
+                <Ionicons name="log-out-outline" size={14} color={COLORS.dangerText} />
                 <View>
                   <Text style={styles.timeLabel}>انصراف</Text>
                   <Text style={styles.timeValue}>{formatTime(item.checkOut?.time)}</Text>
@@ -197,36 +209,36 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  container: { flex: 1, backgroundColor: COLORS.bg },
   profileCard: {
-    flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
-    borderRadius: 14, padding: 16, marginBottom: 16, elevation: 2
+    flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: COLORS.white,
+    borderRadius: 14, padding: 16, marginBottom: 16, ...CARD_SHADOW
   },
   avatarWrap: {
-    width: 56, height: 56, borderRadius: 28, backgroundColor: '#111111',
+    width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.primary,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
   },
   avatarImage: { width: 56, height: 56 },
   avatarInitials: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
   profileInfo: { marginRight: 14, alignItems: 'flex-end', flex: 1 },
-  profileName: { fontSize: 18, fontWeight: 'bold', color: '#111111' },
-  profileDetail: { fontSize: 13, color: '#777', marginTop: 3 },
-  monthLabel: { fontSize: 13, color: '#777', textAlign: 'right', marginBottom: 16 },
+  profileName: { fontSize: 18, fontWeight: 'bold', color: COLORS.black },
+  profileDetail: { fontSize: 13, color: COLORS.textMuted, marginTop: 3 },
+  monthLabel: { fontSize: 13, color: COLORS.textMuted, textAlign: 'right', marginBottom: 16 },
   statsRow: { flexDirection: 'row-reverse', gap: 10, marginBottom: 24 },
-  statCard: { flex: 1, borderRadius: 12, padding: 14, alignItems: 'center' },
+  statCard: { flex: 1, backgroundColor: COLORS.white, borderRadius: 12, padding: 14, alignItems: 'center', ...CARD_SHADOW },
+  statIconWrap: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   statValue: { fontSize: 22, fontWeight: 'bold' },
   statLabel: { fontSize: 12, color: '#555', marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#111111', textAlign: 'right', marginBottom: 10 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 1 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.black, textAlign: 'right', marginBottom: 10 },
+  card: { backgroundColor: COLORS.white, borderRadius: 12, padding: 14, marginBottom: 10, ...CARD_SHADOW },
   cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusPillText: { fontSize: 12, fontWeight: 'bold' },
   date: { fontSize: 12, color: '#888' },
   timesRow: { flexDirection: 'row-reverse', gap: 24 },
   timeBlock: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  timeDot: { width: 8, height: 8, borderRadius: 4, marginTop: 2 },
-  timeLabel: { fontSize: 11, color: '#999', textAlign: 'right' },
-  timeValue: { fontSize: 15, fontWeight: '600', color: '#111111', textAlign: 'right' },
-  lateNote: { fontSize: 12, color: '#b46a00', textAlign: 'right', marginTop: 8 },
+  timeLabel: { fontSize: 11, color: COLORS.gray, textAlign: 'right' },
+  timeValue: { fontSize: 15, fontWeight: '600', color: COLORS.black, textAlign: 'right' },
+  lateNote: { fontSize: 12, color: COLORS.warningText, textAlign: 'right', marginTop: 8 },
   empty: { textAlign: 'center', color: '#888', marginTop: 10 }
 });

@@ -6,6 +6,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
+import { CARD_SHADOW } from '../theme/colors';
 
 const advanceStatusLabels = {
   pending: { text: 'قيد الانتظار', color: '#b46a00', bg: '#fff3e0' },
@@ -147,7 +148,7 @@ export default function LoanScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F7FA' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, elevation: 1 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, ...CARD_SHADOW },
   cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   amountText: { fontSize: 16, fontWeight: 'bold', color: '#111111' },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
@@ -159,7 +160,8 @@ const styles = StyleSheet.create({
 
   fab: {
     position: 'absolute', bottom: 20, left: 20, right: 20,
-    backgroundColor: '#2F80ED', padding: 16, borderRadius: 30, alignItems: 'center', elevation: 4
+    backgroundColor: '#2F80ED', padding: 16, borderRadius: 30, alignItems: 'center', elevation: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6
   },
   fabText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
 

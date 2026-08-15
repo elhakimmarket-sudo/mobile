@@ -1,11 +1,15 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { COLORS, CARD_SHADOW } from '../theme/colors';
 
-// مربع في الشبكة - أيقونة فوق واسمه تحت، اتنين في الصف
-const MenuTile = ({ icon, label, onPress }) => (
+// مربع في الشبكة - أيقونة جوه بادج ملون فوق واسمه تحت، اتنين في الصف
+const MenuTile = ({ icon, badgeBg, iconColor, label, onPress }) => (
   <TouchableOpacity style={styles.tile} onPress={onPress}>
-    <Text style={styles.tileIcon}>{icon}</Text>
+    <View style={[styles.tileIconWrap, { backgroundColor: badgeBg }]}>
+      <Ionicons name={icon} size={20} color={iconColor} />
+    </View>
     <Text style={styles.tileLabel}>{label}</Text>
   </TouchableOpacity>
 );
@@ -14,12 +18,12 @@ export default function MenuScreen({ navigation }) {
   const { user, logout } = useAuth();
 
   const items = [
-    { icon: '💳', label: 'سلفة شهرية', screen: 'Loan' },
-    { icon: '🏖️', label: 'طلب إجازة', screen: 'Leave' },
-    { icon: '🎁', label: 'المكافآت', screen: 'Rewards' },
-    { icon: '⚖️', label: 'الجزاءات', screen: 'Penalties' },
-    { icon: '💰', label: 'الراتب', screen: 'Salary' },
-    { icon: '📊', label: 'أدائي', screen: 'Performance' }
+    { icon: 'card-outline', badgeBg: COLORS.infoBg, iconColor: COLORS.infoText, label: 'سلفة شهرية', screen: 'Loan' },
+    { icon: 'sunny-outline', badgeBg: COLORS.warningBg, iconColor: COLORS.warningText, label: 'طلب إجازة', screen: 'Leave' },
+    { icon: 'gift-outline', badgeBg: COLORS.successBg, iconColor: COLORS.successText, label: 'المكافآت', screen: 'Rewards' },
+    { icon: 'alert-circle-outline', badgeBg: COLORS.dangerBg, iconColor: COLORS.dangerText, label: 'الجزاءات', screen: 'Penalties' },
+    { icon: 'cash-outline', badgeBg: COLORS.grayLight, iconColor: COLORS.black, label: 'الراتب', screen: 'Salary' },
+    { icon: 'stats-chart-outline', badgeBg: COLORS.infoBg, iconColor: COLORS.infoText, label: 'أدائي', screen: 'Performance' }
   ];
 
   return (
@@ -29,9 +33,11 @@ export default function MenuScreen({ navigation }) {
           {user?.profilePhotoUrl ? (
             <Image source={{ uri: user.profilePhotoUrl }} style={styles.avatarImage} />
           ) : (
-            <Text style={styles.avatarPlaceholder}>👤</Text>
+            <Ionicons name="person-outline" size={30} color="#fff" />
           )}
-          <View style={styles.avatarEditBadge}><Text style={styles.avatarEditBadgeText}>✏️</Text></View>
+          <View style={styles.avatarEditBadge}>
+            <Ionicons name="pencil" size={11} color="#fff" />
+          </View>
         </TouchableOpacity>
         <Text style={styles.profileName}>{user?.name}</Text>
         <Text style={styles.profileRole}>{user?.position || 'موظف'}</Text>
@@ -39,11 +45,19 @@ export default function MenuScreen({ navigation }) {
 
       <View style={styles.grid}>
         {items.map((item) => (
-          <MenuTile key={item.screen} icon={item.icon} label={item.label} onPress={() => navigation.navigate(item.screen)} />
+          <MenuTile
+            key={item.screen}
+            icon={item.icon}
+            badgeBg={item.badgeBg}
+            iconColor={item.iconColor}
+            label={item.label}
+            onPress={() => navigation.navigate(item.screen)}
+          />
         ))}
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+        <Ionicons name="log-out-outline" size={16} color="#B71C1C" />
         <Text style={styles.logoutText}>تسجيل الخروج</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -51,37 +65,37 @@ export default function MenuScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  profileCard: { marginBottom: 20, alignItems: 'flex-end' },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  profileCard: { marginBottom: 20, alignItems: 'center' },
   avatarWrap: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: '#fff',
+    width: 72, height: 72, borderRadius: 36, backgroundColor: COLORS.primary,
     alignItems: 'center', justifyContent: 'center', marginBottom: 10,
-    elevation: 2, overflow: 'visible'
+    ...CARD_SHADOW, overflow: 'visible'
   },
   avatarImage: { width: 72, height: 72, borderRadius: 36 },
-  avatarPlaceholder: { fontSize: 32 },
   avatarEditBadge: {
     position: 'absolute', bottom: -2, left: -2, width: 24, height: 24, borderRadius: 12,
-    backgroundColor: '#2F80ED', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#F5F7FA'
+    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.bg
   },
-  avatarEditBadgeText: { fontSize: 11 },
-  profileName: { fontSize: 20, fontWeight: 'bold', color: '#111111' },
-  profileRole: { fontSize: 13, color: '#777', marginTop: 2 },
+  profileName: { fontSize: 20, fontWeight: 'bold', color: COLORS.black },
+  profileRole: { fontSize: 13, color: COLORS.textMuted, marginTop: 2 },
 
-  // شبكة اتنين في الصف - أيقونة فوق واسمها تحت
+  // شبكة اتنين في الصف - بادج ملون فوق واسمه تحت
   grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between' },
   tile: {
     width: '48%',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.white,
     borderRadius: 14,
-    paddingVertical: 24,
+    paddingVertical: 22,
     alignItems: 'center',
     marginBottom: 14,
-    elevation: 1
+    ...CARD_SHADOW
   },
-  tileIcon: { fontSize: 30, marginBottom: 10 },
-  tileLabel: { fontSize: 14, color: '#111111', fontWeight: '600' },
+  tileIconWrap: {
+    width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 10
+  },
+  tileLabel: { fontSize: 14, color: COLORS.black, fontWeight: '600' },
 
-  logoutButton: { marginTop: 10, alignItems: 'center', padding: 14 },
+  logoutButton: { marginTop: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, padding: 14 },
   logoutText: { color: '#B71C1C', fontSize: 15 }
 });
