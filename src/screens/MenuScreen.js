@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 import { COLORS, CARD_SHADOW } from '../theme/colors';
 
 // مربع في الشبكة - أيقونة جوه بادج ملون فوق واسمه تحت، اتنين في الصف
@@ -15,7 +17,20 @@ const MenuTile = ({ icon, badgeBg, iconColor, label, onPress }) => (
 );
 
 export default function MenuScreen({ navigation }) {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUserFields } = useAuth();
+  const [photoFailed, setPhotoFailed] = useState(false);
+
+  // بيانات اليوزر المحفوظة محليًا (من وقت الدخول) ممكن تبقى قديمة لو صورته اتغيرت من admin-web
+  // بعد كده - فبنجيب أحدث نسخة من السيرفر كل مرة الشاشة تتفتح، ونحدّث النسخة المحفوظة كمان
+  useFocusEffect(
+    useCallback(() => {
+      setPhotoFailed(false);
+      api.get('/auth/me')
+        .then(({ data }) => updateUserFields(data))
+        .catch(() => {});
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   const items = [
     { icon: 'card-outline', badgeBg: COLORS.infoBg, iconColor: COLORS.infoText, label: 'سلفة شهرية', screen: 'Loan' },
@@ -30,8 +45,12 @@ export default function MenuScreen({ navigation }) {
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <View style={styles.profileCard}>
         <TouchableOpacity style={styles.avatarWrap} onPress={() => navigation.navigate('EditProfilePhoto')}>
-          {user?.profilePhotoUrl ? (
-            <Image source={{ uri: user.profilePhotoUrl }} style={styles.avatarImage} />
+          {user?.profilePhotoUrl && !photoFailed ? (
+            <Image
+              source={{ uri: user.profilePhotoUrl }}
+              style={styles.avatarImage}
+              onError={() => setPhotoFailed(true)}
+            />
           ) : (
             <Ionicons name="person-outline" size={30} color="#fff" />
           )}
