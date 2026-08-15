@@ -4,6 +4,7 @@ import {
   TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, ScrollView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 
 const loanStatusLabels = {
@@ -14,6 +15,7 @@ const loanStatusLabels = {
 };
 
 export default function FinanceScreen() {
+  const insets = useSafeAreaInsets();
   const [loans, setLoans] = useState([]);
   const [records, setRecords] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -132,7 +134,7 @@ export default function FinanceScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+          <View style={[styles.modalBox, { paddingBottom: 20 + insets.bottom }]}>
             <Text style={styles.modalTitle}>طلب سلفة جديدة</Text>
 
             <Text style={styles.label}>المبلغ المطلوب (جنيه)</Text>

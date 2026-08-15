@@ -4,29 +4,34 @@ import {
   TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, ScrollView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 
-const loanStatusLabels = {
+const advanceStatusLabels = {
   pending: { text: 'قيد الانتظار', color: '#b46a00', bg: '#fff3e0' },
   approved: { text: 'موافق عليها', color: '#1e7e34', bg: '#e6f4ea' },
-  rejected: { text: 'مرفوضة', color: '#9c0c23', bg: '#fdecea' },
-  completed: { text: 'مسددة بالكامل', color: '#555', bg: '#eee' }
+  rejected: { text: 'مرفوضة', color: '#9c0c23', bg: '#fdecea' }
 };
 
+const monthNames = [
+  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+];
+
 export default function LoanScreen() {
-  const [loans, setLoans] = useState([]);
+  const insets = useSafeAreaInsets();
+  const [advances, setAdvances] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const [amount, setAmount] = useState('');
-  const [installments, setInstallments] = useState('');
   const [reason, setReason] = useState('');
 
   const fetchData = async () => {
     try {
-      const { data } = await api.get('/loan/my');
-      setLoans(data);
+      const { data } = await api.get('/advance/my');
+      setAdvances(data);
     } catch (error) {
       console.log('خطأ في جلب طلبات السلف', error.message);
     }
@@ -46,28 +51,30 @@ export default function LoanScreen() {
 
   const resetForm = () => {
     setAmount('');
-    setInstallments('');
     setReason('');
   };
 
-  const submitLoan = async () => {
-    if (!amount || !installments) {
-      Alert.alert('تنبيه', 'من فضلك أدخل المبلغ وعدد الأقساط');
+  const submitAdvance = async () => {
+    if (!amount) {
+      Alert.alert('تنبيه', 'من فضلك أدخل مبلغ السلفة');
       return;
     }
     setSubmitting(true);
     try {
-      await api.post('/loan', {
+      const { data } = await api.post('/advance', {
         amount: Number(amount),
-        installmentsCount: Number(installments),
         reason
       });
-      Alert.alert('تم', 'تم إرسال طلب السلفة بنجاح، في انتظار موافقة الإدارة');
+      Alert.alert('تم', data.message);
       setModalVisible(false);
       resetForm();
       fetchData();
     } catch (error) {
-      Alert.alert('خطأ', error.response?.data?.message || 'حدث خطأ أثناء إرسال الطلب');
+      // لو اترفض تلقائيًا بسبب الرصيد، السيرفر بيرجع الرسالة والسبب في نفس الوقت
+      Alert.alert('تنبيه', error.response?.data?.message || 'حدث خطأ أثناء إرسال الطلب');
+      setModalVisible(false);
+      resetForm();
+      fetchData();
     } finally {
       setSubmitting(false);
     }
@@ -79,26 +86,21 @@ export default function LoanScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {loans.length === 0 && <Text style={styles.empty}>لا يوجد طلبات سلف بعد</Text>}
-        {loans.map((loan) => {
-          const st = loanStatusLabels[loan.status] || loanStatusLabels.pending;
+        {advances.length === 0 && <Text style={styles.empty}>لا يوجد طلبات سلف بعد</Text>}
+        {advances.map((a) => {
+          const st = advanceStatusLabels[a.status] || advanceStatusLabels.pending;
           return (
-            <View key={loan._id} style={styles.card}>
+            <View key={a._id} style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.amountText}>{loan.amount} جنيه</Text>
+                <Text style={styles.amountText}>{a.amount} جنيه</Text>
                 <View style={[styles.badge, { backgroundColor: st.bg }]}>
                   <Text style={[styles.badgeText, { color: st.color }]}>{st.text}</Text>
                 </View>
               </View>
-              <Text style={styles.detailText}>على {loan.installmentsCount} قسط</Text>
-              {loan.status === 'approved' || loan.status === 'completed' ? (
-                <Text style={styles.detailText}>
-                  القسط الشهري: {loan.monthlyInstallment} جنيه — المتبقي: {loan.remainingAmount} جنيه
-                </Text>
-              ) : null}
-              {!!loan.reason && <Text style={styles.reasonText}>{loan.reason}</Text>}
-              {loan.status === 'rejected' && !!loan.reviewNote && (
-                <Text style={styles.rejectNote}>سبب الرفض: {loan.reviewNote}</Text>
+              <Text style={styles.detailText}>شهر {monthNames[a.month - 1]} {a.year}</Text>
+              {!!a.reason && <Text style={styles.reasonText}>{a.reason}</Text>}
+              {a.status === 'rejected' && !!a.reviewNote && (
+                <Text style={styles.rejectNote}>{a.reviewNote}</Text>
               )}
             </View>
           );
@@ -111,14 +113,11 @@ export default function LoanScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+          <View style={[styles.modalBox, { paddingBottom: 20 + insets.bottom }]}>
             <Text style={styles.modalTitle}>طلب سلفة جديدة</Text>
 
             <Text style={styles.label}>المبلغ المطلوب (جنيه)</Text>
             <TextInput style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} placeholder="1000" />
-
-            <Text style={styles.label}>عدد الأقساط (بالشهور)</Text>
-            <TextInput style={styles.input} keyboardType="numeric" value={installments} onChangeText={setInstallments} placeholder="3" />
 
             <Text style={styles.label}>السبب (اختياري)</Text>
             <TextInput
@@ -129,11 +128,13 @@ export default function LoanScreen() {
               placeholder="اكتب سبب طلب السلفة..."
             />
 
+            <Text style={styles.hintText}>هتتخصم بالكامل من راتب الشهر الحالي، وهتترفض تلقائيًا لو تجاوزت رصيدك المتاح.</Text>
+
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => { setModalVisible(false); resetForm(); }}>
                 <Text style={styles.cancelBtnText}>إلغاء</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.submitBtn} onPress={submitLoan} disabled={submitting}>
+              <TouchableOpacity style={styles.submitBtn} onPress={submitAdvance} disabled={submitting}>
                 {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>إرسال الطلب</Text>}
               </TouchableOpacity>
             </View>
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
 
   fab: {
     position: 'absolute', bottom: 20, left: 20, right: 20,
-    backgroundColor: '#C8102E', padding: 16, borderRadius: 30, alignItems: 'center', elevation: 4
+    backgroundColor: '#2F80ED', padding: 16, borderRadius: 30, alignItems: 'center', elevation: 4
   },
   fabText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
 
@@ -170,9 +171,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA', borderRadius: 10, padding: 12,
     borderWidth: 1, borderColor: '#DDD', textAlign: 'right', fontSize: 14
   },
+  hintText: { fontSize: 12, color: '#999', textAlign: 'right', marginTop: 10 },
   modalActions: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginTop: 20, gap: 10 },
   cancelBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#F5F7FA', alignItems: 'center' },
   cancelBtnText: { color: '#555' },
-  submitBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#C8102E', alignItems: 'center' },
+  submitBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#2F80ED', alignItems: 'center' },
   submitBtnText: { color: '#fff', fontWeight: 'bold' }
 });

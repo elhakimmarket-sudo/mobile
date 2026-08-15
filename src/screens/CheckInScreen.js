@@ -10,11 +10,16 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
 // mode: 'check-in' أو 'check-out'
 export default function CheckInScreen({ route, navigation }) {
   const { mode } = route.params; // 'check-in' | 'check-out'
+  const insets = useSafeAreaInsets();
+  const { setAuthInProgress } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef(null);
 
@@ -58,6 +63,21 @@ export default function CheckInScreen({ route, navigation }) {
       return;
     }
 
+    // تأكيد الهوية بالبصمة أو Face ID - لو مش متفعّلين على الموبايل، بيرجع تلقائي لكلمة مرور/نقش قفل الشاشة
+    // نحذّر نظام قفل التطبيق الأول إن التغيير الجاي في حالة التطبيق سببه نافذة المصادقة دي، مش خروج حقيقي
+    setAuthInProgress(true);
+    const authResult = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'أكد هويتك للمتابعة',
+      cancelLabel: 'إلغاء',
+      disableDeviceFallback: false
+    });
+    setAuthInProgress(false);
+
+    if (!authResult.success) {
+      Alert.alert('تنبيه', 'لازم تأكد هويتك عشان تكمل تسجيل الحضور/الانصراف');
+      return;
+    }
+
     setLoading(true);
     try {
       const formData = new FormData();
@@ -74,12 +94,17 @@ export default function CheckInScreen({ route, navigation }) {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      Alert.alert('تم', data.message, [
+      const successMessage = mode === 'check-out'
+        ? `${data.message} - مستنيينك بكرا! 👋`
+        : data.message;
+
+      Alert.alert('تم', successMessage, [
         { text: 'حسنًا', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
       const msg = error.response?.data?.message || 'حدث خطأ، حاول مرة أخرى';
-      Alert.alert('خطأ', msg);
+      const detail = error.response?.data?.error;
+      Alert.alert('خطأ', detail ? `${msg}\n\nتفاصيل: ${detail}` : msg);
     } finally {
       setLoading(false);
     }
@@ -102,12 +127,22 @@ export default function CheckInScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>
-        {mode === 'check-in' ? '📍 تسجيل الحضور' : '📍 تسجيل الانصراف'}
-      </Text>
-
-      {locating && <Text style={styles.locationText}>⏳ جاري تحديد موقعك...</Text>}
-      {!locating && location && <Text style={styles.locationText}>✅ تم تحديد موقعك</Text>}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>
+          {mode === 'check-in' ? 'تسجيل الحضور' : 'تسجيل الانصراف'}
+        </Text>
+        <View style={styles.locationPill}>
+          <View
+            style={[
+              styles.locationDot,
+              { backgroundColor: locating ? '#F5A623' : location ? '#2E7D32' : '#B71C1C' }
+            ]}
+          />
+          <Text style={styles.locationPillText}>
+            {locating ? 'جاري تحديد الموقع...' : location ? 'تم تحديد الموقع' : 'الموقع غير متاح'}
+          </Text>
+        </View>
+      </View>
 
       {!photo ? (
         <CameraView ref={cameraRef} style={styles.camera} facing="front" />
@@ -115,7 +150,7 @@ export default function CheckInScreen({ route, navigation }) {
         <Image source={{ uri: photo }} style={styles.camera} />
       )}
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, { paddingBottom: 16 + insets.bottom }]}>
         {!photo ? (
           <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
             <Text style={styles.buttonText}>📸 التقاط صورة</Text>
@@ -143,14 +178,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   header: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    paddingVertical: 14,
-    backgroundColor: '#111111'
+    backgroundColor: '#111111',
+    paddingTop: 18,
+    paddingBottom: 14,
+    alignItems: 'center'
   },
-  locationText: { color: '#fff', textAlign: 'center', paddingBottom: 8, backgroundColor: '#111111' },
+  headerTitle: { color: '#fff', fontSize: 19, fontWeight: 'bold', marginBottom: 8 },
+  locationPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20
+  },
+  locationDot: { width: 7, height: 7, borderRadius: 4 },
+  locationPillText: { color: '#ddd', fontSize: 12 },
   camera: { flex: 1 },
   actions: { padding: 16, backgroundColor: '#111' },
   captureButton: {

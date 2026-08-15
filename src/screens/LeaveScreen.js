@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 
 const typeLabels = {
@@ -27,6 +28,7 @@ const formatDateYMD = (date) => {
 };
 
 export default function LeaveScreen() {
+  const insets = useSafeAreaInsets();
   const [leaves, setLeaves] = useState([]);
   const [balance, setBalance] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -158,7 +160,7 @@ export default function LeaveScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+          <View style={[styles.modalBox, { paddingBottom: 20 + insets.bottom }]}>
             <Text style={styles.modalTitle}>طلب إجازة جديد</Text>
 
             <Text style={styles.label}>نوع الإجازة</Text>

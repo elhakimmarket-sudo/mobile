@@ -3,9 +3,11 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { ActivityIndicator, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
+import AppLockScreen from '../screens/AppLockScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CheckInScreen from '../screens/CheckInScreen';
@@ -15,10 +17,27 @@ import LeaveScreen from '../screens/LeaveScreen';
 import RewardsScreen from '../screens/RewardsScreen';
 import PenaltiesScreen from '../screens/PenaltiesScreen';
 import SalaryScreen from '../screens/SalaryScreen';
+import PerformanceScreen from '../screens/PerformanceScreen';
+import EditProfilePhotoScreen from '../screens/EditProfilePhotoScreen';
+import KioskHomeScreen from '../screens/KioskHomeScreen';
+import KioskSearchScreen from '../screens/KioskSearchScreen';
+import KioskConfirmScreen from '../screens/KioskConfirmScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const MenuStack = createNativeStackNavigator();
+const KioskStack = createNativeStackNavigator();
+
+// ستاك مستقل تمامًا لوضع "يوزر المكتب" - مفيش تابات ولا قائمة عادية، بس شاشة رئيسية وبحث وتأكيد
+function KioskStackNavigator() {
+  return (
+    <KioskStack.Navigator screenOptions={{ headerShown: false }}>
+      <KioskStack.Screen name="KioskHome" component={KioskHomeScreen} />
+      <KioskStack.Screen name="KioskSearch" component={KioskSearchScreen} options={{ headerShown: true, title: 'دوّر على اسمك' }} />
+      <KioskStack.Screen name="KioskConfirm" component={KioskConfirmScreen} />
+    </KioskStack.Navigator>
+  );
+}
 
 // ستاك داخلي لتبويب "القائمة" - عشان تقدر تدخل من الليستة لصفحات فرعية (سلفة/إجازة/مكافآت/جزاءات/راتب)
 // وترجع بزرار الرجوع العادي، من غير ما تتخانق مع باقي التابات
@@ -31,6 +50,8 @@ function MenuStackNavigator() {
       <MenuStack.Screen name="Rewards" component={RewardsScreen} options={{ title: 'المكافآت' }} />
       <MenuStack.Screen name="Penalties" component={PenaltiesScreen} options={{ title: 'الجزاءات' }} />
       <MenuStack.Screen name="Salary" component={SalaryScreen} options={{ title: 'الراتب' }} />
+      <MenuStack.Screen name="Performance" component={PerformanceScreen} options={{ title: 'أدائي' }} />
+      <MenuStack.Screen name="EditProfilePhoto" component={EditProfilePhotoScreen} options={{ headerShown: false }} />
     </MenuStack.Navigator>
   );
 }
@@ -39,16 +60,44 @@ function MenuStackNavigator() {
 // أول تاب بيتحط أقصى اليمين، وآخر تاب بيتحط أقصى الشمال
 function MainTabs() {
   return (
-    <Tab.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
-      <Tab.Screen name="لوحة المعلومات" component={DashboardScreen} options={{ title: 'لوحة المعلومات' }} />
-      <Tab.Screen name="تسجيل" component={HomeScreen} options={{ title: 'تسجيل' }} />
-      <Tab.Screen name="القائمة" component={MenuStackNavigator} options={{ title: 'القائمة', headerShown: false }} />
+    <Tab.Navigator
+      screenOptions={{
+        headerTitleAlign: 'center',
+        tabBarActiveTintColor: '#2F80ED',
+        tabBarInactiveTintColor: '#999999'
+      }}
+    >
+      <Tab.Screen
+        name="لوحة المعلومات"
+        component={DashboardScreen}
+        options={{
+          title: 'لوحة المعلومات',
+          tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} />
+        }}
+      />
+      <Tab.Screen
+        name="تسجيل"
+        component={HomeScreen}
+        options={{
+          title: 'تسجيل',
+          tabBarIcon: ({ color, size }) => <Ionicons name="checkmark-circle-outline" size={size} color={color} />
+        }}
+      />
+      <Tab.Screen
+        name="القائمة"
+        component={MenuStackNavigator}
+        options={{
+          title: 'القائمة',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => <Ionicons name="menu-outline" size={size} color={color} />
+        }}
+      />
     </Tab.Navigator>
   );
 }
 
 export default function AppNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, appLocked } = useAuth();
 
   if (loading) {
     return (
@@ -63,6 +112,10 @@ export default function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <Stack.Screen name="Login" component={LoginScreen} />
+        ) : user.role === 'kiosk' ? (
+          <Stack.Screen name="KioskMode" component={KioskStackNavigator} />
+        ) : appLocked ? (
+          <Stack.Screen name="AppLock" component={AppLockScreen} />
         ) : (
           <>
             <Stack.Screen name="MainTabs" component={MainTabs} />
