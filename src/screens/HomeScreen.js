@@ -15,6 +15,7 @@ export default function HomeScreen({ navigation }) {
   const [today, setToday] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [allowedBreakMinutes, setAllowedBreakMinutes] = useState(60);
+  const [allowedBreakCount, setAllowedBreakCount] = useState(1);
 
   const [breakEndTime, setBreakEndTime] = useState(null); // Date
   const [remainingSeconds, setRemainingSeconds] = useState(null);
@@ -44,11 +45,15 @@ export default function HomeScreen({ navigation }) {
 
       const allowedMinutes = meRes.data?.allowedBreakMinutes || 60;
       setAllowedBreakMinutes(allowedMinutes);
+      setAllowedBreakCount(meRes.data?.allowedBreakCount || 1);
 
       // لو فيه استراحة شغالة بالفعل (مثلاً المستخدم قفل وفتح التطبيق تاني)، أعد بناء العداد من بيانات السيرفر
+      // - لازم نحسب الوقت المتبقي بعد خصم أي مرات راحة سابقة النهاردة، مش الوقت الكامل من الأول
       const openBreak = todayRecord?.breaks?.find((b) => !b.endTime);
       if (openBreak) {
-        const endTime = new Date(new Date(openBreak.startTime).getTime() + allowedMinutes * 60000);
+        const usedMinutes = (todayRecord.breaks || []).reduce((sum, b) => sum + (b.durationMinutes || 0), 0);
+        const remainingMinutes = Math.max(0, allowedMinutes - usedMinutes);
+        const endTime = new Date(new Date(openBreak.startTime).getTime() + remainingMinutes * 60000);
         setBreakEndTime(endTime);
         if (endTime.getTime() > Date.now()) {
           await scheduleBreakEndNotification(endTime);
@@ -120,6 +125,11 @@ export default function HomeScreen({ navigation }) {
   const hasCheckedIn = today?.checkIn?.time;
   const hasCheckedOut = today?.checkOut?.time;
   const onBreak = today?.breaks?.some((b) => !b.endTime);
+
+  // خلص كل مرات الراحة المسموحة، أو خلص إجمالي الوقت المسموح (حتى لو لسه فاضل مرات) - في الحالتين مينفعش يبدأ راحة تانية
+  const todayBreaksCount = today?.breaks?.length || 0;
+  const todayUsedBreakMinutes = (today?.breaks || []).reduce((sum, b) => sum + (b.durationMinutes || 0), 0);
+  const breaksExhausted = !onBreak && (todayBreaksCount >= allowedBreakCount || todayUsedBreakMinutes >= allowedBreakMinutes);
 
   const handleBreak = async (action) => {
     try {
@@ -291,10 +301,21 @@ export default function HomeScreen({ navigation }) {
                 <Ionicons name="log-out-outline" size={18} color="#fff" />
                 <Text style={styles.primaryButtonText} numberOfLines={1}>تسجيل الانصراف</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => handleBreak('start')}>
-                <Ionicons name="cafe-outline" size={16} color={COLORS.black} />
-                <Text style={styles.secondaryButtonText} numberOfLines={1}>بدء الراحة</Text>
-              </TouchableOpacity>
+              {breaksExhausted ? (
+                <View style={[styles.secondaryButton, styles.secondaryButtonDisabled]}>
+                  <Ionicons name="cafe-outline" size={16} color={COLORS.gray} />
+                  <Text style={[styles.secondaryButtonText, { color: COLORS.gray }]} numberOfLines={1}>
+                    خلصت الراحة النهاردة
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => handleBreak('start')}>
+                  <Ionicons name="cafe-outline" size={16} color={COLORS.black} />
+                  <Text style={styles.secondaryButtonText} numberOfLines={1}>
+                    بدء الراحة{allowedBreakCount > 1 ? ` (${todayBreaksCount}/${allowedBreakCount})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </>
           ) : (
             <>
@@ -425,6 +446,7 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   secondaryButtonText: { color: COLORS.black, fontSize: 14, fontWeight: '600' },
+  secondaryButtonDisabled: { backgroundColor: COLORS.grayLight, borderColor: COLORS.grayLight },
 
   doneCard: { padding: 20, alignItems: 'center', gap: 6 },
   doneText: { fontSize: 15, color: COLORS.successText, textAlign: 'center' }
