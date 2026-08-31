@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ScrollView, Alert, Vibration } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { scheduleBreakEndNotification, cancelBreakNotification } from '../services/breakNotifications';
+import { scheduleCheckOutReminder, cancelCheckOutReminder, listenForCheckOutAcknowledge } from '../services/checkoutNotifications';
 import { COLORS, CARD_SHADOW } from '../theme/colors';
 
 // نمط الاهتزاز وقت الإنذار - بيتكرر لحد ما يتلغي يدويًا بـ Vibration.cancel()
@@ -21,27 +22,65 @@ export default function HomeScreen({ navigation }) {
   const [remainingSeconds, setRemainingSeconds] = useState(null);
   const [alarmRinging, setAlarmRinging] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  // الموظف في وردية ليلية بدأت امبارح ولسه ماسجلش انصراف - بنوضحله ده في الشاشة
+  const [isOvernightWorkDay, setIsOvernightWorkDay] = useState(false);
 
   // بتتحدث كل ثانية - بتُستخدم لعرض الساعة/التاريخ الحاليين ولحساب مدة العمل الحية
   const [now, setNow] = useState(new Date());
 
   const intervalRef = useRef(null);
   const clockIntervalRef = useRef(null);
+  // ميعاد نهاية الوردية اللي اتجدول عليه تنبيه الانصراف - عشان مانعيدش الجدولة كل مرة الشاشة تتحدث
+  const checkoutReminderScheduledFor = useRef(null);
 
   const fetchToday = async () => {
     try {
       const nowDate = new Date();
-      const [attendanceRes, meRes, notificationsRes] = await Promise.all([
+      const [attendanceRes, meRes, notificationsRes, workDayRes] = await Promise.all([
         api.get('/attendance/my', { params: { month: nowDate.getMonth() + 1, year: nowDate.getFullYear() } }),
         api.get('/auth/me'),
-        api.get('/notifications/my').catch(() => ({ data: { unreadCount: 0 } }))
+        api.get('/notifications/my').catch(() => ({ data: { unreadCount: 0 } })),
+        api.get('/attendance/my/current-day').catch(() => ({ data: null }))
       ]);
       setUnreadCount(notificationsRes.data?.unreadCount || 0);
 
-      // بتوقيت مصر (مش UTC) - عشان يتطابق مع تاريخ سجل الحضور المحسوب في الباك اند بالظبط
-      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(nowDate);
-      const todayRecord = attendanceRes.data.find((r) => r.date === todayStr);
+      // "يوم العمل الحالي" جاي من السيرفر - مش بالضرورة تاريخ النهاردة. في الوردية الليلية
+      // (زي 4م → 1ص) الموظف بعد نص الليل بيفضل في يوم عمل امبارح لحد ما يسجل انصراف،
+      // فلازم نعرض سجل امبارح مش نبدأ يوم جديد. لو النداء فشل بنرجع لتاريخ مصر عادي
+      const fallbackStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(nowDate);
+      const workDayStr = workDayRes.data?.workDay || fallbackStr;
+      setIsOvernightWorkDay(!!workDayRes.data?.isOvernightWorkDay);
+
+      let todayRecord = attendanceRes.data.find((r) => r.date === workDayStr);
+
+      // حالة خاصة: أول يوم في الشهر - الوردية الليلية بدأت آخر يوم في الشهر اللي فات،
+      // فسجلها مش موجود أصلاً في بيانات الشهر الحالي اللي جبناها فوق
+      if (!todayRecord && workDayStr.slice(0, 7) !== `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`) {
+        try {
+          const [prevYear, prevMonth] = workDayStr.split('-').map(Number);
+          const prevRes = await api.get('/attendance/my', { params: { month: prevMonth, year: prevYear } });
+          todayRecord = prevRes.data.find((r) => r.date === workDayStr);
+        } catch (e) {
+          // لو فشل، بنكمل عادي بسجل فاضي
+        }
+      }
+
       setToday(todayRecord || null);
+
+      // تنبيه "متنساش تسجيل الانصراف" - بيتجدول في ميعاد نهاية الوردية الرسمي، ويتلغي
+      // أول ما يسجل انصراف فعليًا
+      const officialEnd = workDayRes.data?.officialEnd;
+      if (todayRecord?.checkIn?.time && !todayRecord?.checkOut?.time && officialEnd) {
+        if (!checkoutReminderScheduledFor.current || checkoutReminderScheduledFor.current !== officialEnd) {
+          await scheduleCheckOutReminder(officialEnd);
+          checkoutReminderScheduledFor.current = officialEnd;
+        }
+      } else {
+        if (checkoutReminderScheduledFor.current) {
+          await cancelCheckOutReminder();
+          checkoutReminderScheduledFor.current = null;
+        }
+      }
 
       const allowedMinutes = meRes.data?.allowedBreakMinutes || 60;
       setAllowedBreakMinutes(allowedMinutes);
@@ -114,6 +153,14 @@ export default function HomeScreen({ navigation }) {
     return () => {
       Vibration.cancel();
     };
+  }, []);
+
+  // لما الموظف يدوس "تمام" على تنبيه الانصراف (من جوه التنبيه نفسه)، بنوقف التكرار
+  useEffect(() => {
+    const unsubscribe = listenForCheckOutAcknowledge(() => {
+      checkoutReminderScheduledFor.current = null;
+    });
+    return unsubscribe;
   }, []);
 
   const onRefresh = async () => {
@@ -219,6 +266,15 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
       </View>
+
+      {isOvernightWorkDay && (
+        <View style={styles.overnightBanner}>
+          <Ionicons name="moon-outline" size={15} color={COLORS.warningText} />
+          <Text style={styles.overnightBannerText}>
+            لسه في وردية ليلية مفتوحة من امبارح - سجّل انصرافك
+          </Text>
+        </View>
+      )}
 
       <View style={styles.statusCard}>
         <Text style={styles.statusTitle}>حالة اليوم</Text>
@@ -376,6 +432,17 @@ const styles = StyleSheet.create({
   clockValue: { color: '#fff', fontSize: 32, fontWeight: 'bold', letterSpacing: 1 },
   clockPeriod: { color: '#fff', fontSize: 15, marginBottom: 4 },
 
+  overnightBanner: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.warningBg,
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    marginBottom: 12
+  },
+  overnightBannerText: { flex: 1, fontSize: 13, color: COLORS.warningText, textAlign: 'right' },
   statusCard: {
     backgroundColor: COLORS.white,
     borderRadius: 12,

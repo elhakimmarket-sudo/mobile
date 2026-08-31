@@ -13,7 +13,7 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '../services/api';
 
 // المراحل: select (اختيار حضور/انصراف) -> camera (التقاط صورة) -> password (تأكيد كلمة مرور الموظف)

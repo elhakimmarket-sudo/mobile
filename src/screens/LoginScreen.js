@@ -12,7 +12,7 @@ import {
   Platform,
   Image
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../context/AuthContext';
 
 // رسائل ترحيب بتتغير عشوائيًا في كل مرة يسجل فيها الموظف دخول

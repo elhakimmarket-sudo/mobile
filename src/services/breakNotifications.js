@@ -1,19 +1,19 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-// قناة أندرويد خاصة بتنبيه انتهاء الراحة - أهمية قصوى + اهتزاز طويل + صوت منبه مخصص
-const CHANNEL_ID = 'break-end-alarm';
+// ⚠️ قنوات أندرويد ثابتة بعد إنشائها: أول ما القناة تتعمل مرة واحدة على الجهاز، أي تعديل في
+// إعداداتها (الصوت/الاهتزاز/الأهمية) في الكود مش بيتطبق عليها تاني خالص - الطريقة الوحيدة
+// إن القناة تتعمل من جديد بإعدادات مختلفة إنك تغيّر الـ ID نفسه. عشان كده فيه رقم نسخة في
+// آخر الاسم - أي مرة نغيّر إعدادات القناة لازم نزوّد الرقم ده
+const CHANNEL_ID = 'break-end-alarm-v2';
 
-// اسم ملف الصوت المخصص (لازم يتحط في mobile/assets/sounds/break-alarm.wav
-// ويتسجل في app.json جوه plugin "expo-notifications" -> "sounds"). لو الملف مش موجود
-// وقت البناء، النظام هيرجع تلقائيًا لصوت التنبيهات الافتراضي بدل ما يكسر التطبيق.
-const ALARM_SOUND_FILE = 'break-alarm.wav.wav';
+// نوع التنبيه - بنستخدمه في الإلغاء عشان نلغي تنبيهات الراحة بس من غير ما نمس تنبيهات تانية
+const NOTIFICATION_TYPE = 'break-end';
 
-// عدد مرات تكرار "الرنة" بعد وقت انتهاء الراحة، والفاصل بينهم بالثواني.
-// ملحوظة مهمة: ده مش صوت واحد مستمر بيلف على نفسه (ده محتاج مكتبة تنبيهات أقوى
-// زي notifee + تعديل نيتيف)، لكنه تنبيهات منفصلة متكررة بنفس صوت المنبه القوي كل شوية،
-// عشان يحس المستخدم إن الموبايل "بيرن" باستمرار لحد ما يفتح التطبيق وينهي الراحة -
-// وده بيشتغل حتى لو التطبيق مقفول تمامًا على أندرويد وآيفون لأنه إشعارات مجدولة من نظام التشغيل نفسه.
+
+// ملحوظة مهمة: ده مش صوت واحد مستمر بيلف على نفسه (ده محتاج مكتبة تنبيهات أقوى زي notifee
+// + تعديل نيتيف)، لكنه تنبيهات منفصلة متكررة بنفس صوت المنبه القوي كل شوية، عشان يحس
+// المستخدم إن الموبايل "بيرن" باستمرار لحد ما يفتح التطبيق وينهي الراحة
 const REPEAT_COUNT = 20;
 const REPEAT_INTERVAL_SECONDS = 8;
 
@@ -24,7 +24,6 @@ export const setupBreakNotificationChannel = async () => {
       name: 'تنبيه انتهاء الراحة',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 600, 300, 600, 300, 600, 300, 600, 300, 600],
-      sound: ALARM_SOUND_FILE,
       enableVibrate: true,
       bypassDnd: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC
@@ -39,8 +38,6 @@ export const requestNotificationPermissions = async () => {
   }
 };
 
-let scheduledNotificationIds = [];
-
 // بيجدول "رنة" منبه متكررة تبدأ بالظبط وقت انتهاء الراحة وتفضل تتكرر لحد ما الموظف
 // يفتح التطبيق وينهي الراحة - بتشتغل حتى لو التطبيق في الخلفية أو مقفول تمامًا
 export const scheduleBreakEndNotification = async (endDate) => {
@@ -48,35 +45,57 @@ export const scheduleBreakEndNotification = async (endDate) => {
 
   const baseSeconds = Math.max(1, Math.round((endDate.getTime() - Date.now()) / 1000));
 
-  const ids = await Promise.all(
+  await Promise.all(
     Array.from({ length: REPEAT_COUNT }, (_, i) => {
       const seconds = baseSeconds + i * REPEAT_INTERVAL_SECONDS;
       return Notifications.scheduleNotificationAsync({
         content: {
           title: '⏰ انتهت فترة الراحة',
           body: 'الوقت المسموح للراحة خلص - يرجى العودة للعمل',
-          sound: ALARM_SOUND_FILE,
-          priority: Notifications.AndroidNotificationPriority.MAX
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          data: { type: NOTIFICATION_TYPE }
         },
+        // ⚠️ لازم نحدد نوع الـ trigger صراحةً في expo-notifications 0.32 (Expo SDK 54).
+        // الاختصار القديم { seconds } من غير type مابقاش بيتفهم صح، والنتيجة إن التنبيه
+        // مكانش بيترن أصلاً لما التطبيق يبقى مقفول
         trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds,
+          repeats: false,
           channelId: CHANNEL_ID
         }
       });
     })
   );
-
-  scheduledNotificationIds = ids;
 };
 
+// ⚠️ بتلغي تنبيهات الراحة بس - مش كل التنبيهات المجدولة (عشان ماتمسحش تنبيه "متنساش تسجيل الانصراف").
+//
+// بتشتغل بالبحث في التنبيهات المجدولة فعليًا على الجهاز وفلترتها بالنوع، مش بمصفوفة IDs محفوظة
+// في الذاكرة. السبب: أي مصفوفة في الذاكرة بتضيع أول ما التطبيق يتقفل، فالتنبيهات القديمة
+// المجدولة من جلسة سابقة كانت بتفضل موجودة ومحدش يقدر يلغيها - وبعدين ترن فجأة أول ما
+// الموظف يبدأ راحة جديدة ويقوله "خلصت الراحة" وهو لسه بادئ
 export const cancelBreakNotification = async () => {
-  if (scheduledNotificationIds.length > 0) {
-    try {
-      await Promise.all(scheduledNotificationIds.map((id) => Notifications.cancelScheduledNotificationAsync(id)));
-    } catch (e) {
-      // ممكن يكون جزء منها اتنفذ بالفعل، تجاهل الخطأ
-    }
-    scheduledNotificationIds = [];
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(
+      scheduled
+        .filter((n) => n.content?.data?.type === NOTIFICATION_TYPE)
+        .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
+    );
+  } catch (e) {
+    // مش مهم لو فشل جزء منها - ممكن يكون اتنفذ بالفعل
   }
-  await Notifications.cancelAllScheduledNotificationsAsync();
+
+  // وكمان نشيل أي تنبيهات اتعرضت فعلاً وسايبة في شريط الإشعارات
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    await Promise.all(
+      presented
+        .filter((n) => n.request?.content?.data?.type === NOTIFICATION_TYPE)
+        .map((n) => Notifications.dismissNotificationAsync(n.request.identifier))
+    );
+  } catch (e) {
+    // التنبيهات هتختفي لوحدها لما المستخدم يمسحها
+  }
 };

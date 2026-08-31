@@ -89,7 +89,7 @@ android {
 
     namespace 'com.yourcompany.employeeapp'
     defaultConfig {
-        applicationId 'com.yourcompany.employeeapp'
+        applicationId 'com.elhakim.hr'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

@@ -3,9 +3,14 @@ import Constants from 'expo-constants';
 import api from './api';
 
 // بيخلي الإشعار يظهر فورًا حتى لو التطبيق فاتح قدام المستخدم وقت وصوله (مش بس لما يكون التطبيق مقفول/خلفية)
+//
+// ⚠️ shouldShowAlert اتشال في expo-notifications 0.32 (Expo SDK 54) واتقسم لـ shouldShowBanner
+// (الشريط اللي بيظهر فوق) و shouldShowList (الإشعار في قايمة الإشعارات). لو فضلنا مستخدمين
+// الاسم القديم لوحده، الإشعار مكانش بيظهر ولا بيرن وهو التطبيق مفتوح
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false
   })

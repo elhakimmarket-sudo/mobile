@@ -11,33 +11,21 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.employeeapp",
+      "bundleIdentifier": "com.elhakim.hr",
       "infoPlist": {
         "NSCameraUsageDescription": "التطبيق يحتاج الكاميرا لالتقاط صورة إثبات الحضور والانصراف",
-        "NSLocationWhenInUseUsageDescription": "التطبيق يحتاج موقعك لتسجيل الحضور والانصراف من داخل مقر العمل"
+        "NSLocationWhenInUseUsageDescription": "التطبيق يحتاج موقعك لتسجيل الحضور والانصراف من داخل مقر العمل",
+        "NSPhotoLibraryUsageDescription": "التطبيق يحتاج الوصول لصورك عشان تختار صورتك الشخصية"
       },
-      "runtimeVersion": {
-        "policy": "appVersion"
-      }
+      "runtimeVersion": "1.0.0"
     },
     "android": {
-      "package": "com.yourcompany.employeeapp",
-      "usesCleartextTraffic": true,
+      "package": "com.elhakim.hr",
       "permissions": [
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "runtimeVersion": "1.0.0"
     },
@@ -55,10 +43,11 @@
         }
       ],
       "expo-secure-store",
+      "expo-notifications",
       [
-        "expo-notifications",
+        "expo-image-picker",
         {
-          "sounds": ["./assets/sounds/break-alarm.wav.wav"]
+          "photosPermission": "التطبيق يحتاج الوصول لصورك عشان تختار صورتك الشخصية"
         }
       ]
     ],
