@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "143582126923",
+    "project_id": "elhakim-hr",
+    "storage_bucket": "elhakim-hr.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:143582126923:android:4d687cf849fcde85babece",
+        "android_client_info": {
+          "package_name": "com.elhakim.hr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZP9WIO_VnT5snikiGpyQM1q4ElahwEvY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

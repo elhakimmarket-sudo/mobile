@@ -157,9 +157,9 @@ export default function HomeScreen({ navigation }) {
 
   // لما الموظف يدوس "تمام" على تنبيه الانصراف (من جوه التنبيه نفسه)، بنوقف التكرار
   useEffect(() => {
-    const unsubscribe = listenForCheckOutAcknowledge(() => {
-      checkoutReminderScheduledFor.current = null;
-    });
+    // ⚠️ مانصفّرش checkoutReminderScheduledFor هنا: لو صفّرناه، fetchToday بيعيد جدولة
+    // التنبيهات فورًا ويلغي التأجيل اللي الموظف لسه طالبه. الإلغاء الحقيقي بقى في App.js.
+    const unsubscribe = listenForCheckOutAcknowledge(() => {});
     return unsubscribe;
   }, []);
 

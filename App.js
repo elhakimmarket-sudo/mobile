@@ -5,7 +5,7 @@ import * as Updates from 'expo-updates';
 import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { setupBreakNotificationChannel } from './src/services/breakNotifications';
-import { setupCheckoutNotificationChannel } from './src/services/checkoutNotifications';
+import { setupCheckoutNotificationChannel, registerCheckOutAckHandler } from './src/services/checkoutNotifications';
 
 export default function App() {
   // بنستنى نتأكد فيه تحديث جديد ولا لأ قبل ما نفتح التطبيق العادي - عشان لو فيه تحديث، نحمّله ونعيد الفتح تلقائي
@@ -19,6 +19,14 @@ export default function App() {
     setupBreakNotificationChannel();
     // نفس الفكرة لتنبيه "متنساش تسجيل الانصراف" + تسجيل زرار "تمام" اللي بيظهر جوه التنبيه
     setupCheckoutNotificationChannel();
+  }, []);
+
+  // ⚠️ مستمع ضغطة تنبيه الانصراف لازم يبقى هنا مش جوه شاشة:
+  // المستمع اللي جوه شاشة بيموت مع الشاشة، فلو الموظف كان في شاشة تانية أو التطبيق كان
+  // مقفول مكانش فيه حاجة تلغي التنبيهات المتكررة - وده اللي كان بيخلي الضغط ميسكّتش حاجة.
+  useEffect(() => {
+    const unsubscribe = registerCheckOutAckHandler();
+    return unsubscribe;
   }, []);
 
   const checkForUpdate = async () => {

@@ -7,7 +7,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
-import AppLockScreen from '../screens/AppLockScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CheckInScreen from '../screens/CheckInScreen';
@@ -99,7 +98,7 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
-  const { user, loading, appLocked } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -116,8 +115,6 @@ export default function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : user.role === 'kiosk' ? (
           <Stack.Screen name="KioskMode" component={KioskStackNavigator} />
-        ) : appLocked ? (
-          <Stack.Screen name="AppLock" component={AppLockScreen} />
         ) : (
           <>
             <Stack.Screen name="MainTabs" component={MainTabs} />

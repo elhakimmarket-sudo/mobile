@@ -1,22 +1,22 @@
 import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
-import { AppState } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as LocalAuthentication from 'expo-local-authentication';
-import api from '../services/api';
+import api, { setForcedLogoutHandler } from '../services/api';
 import { getToken, setToken, removeToken } from '../services/secureToken';
 import { registerForPushNotifications } from '../services/pushNotifications';
+import { cancelCheckOutReminder } from '../services/checkoutNotifications';
 
 const AuthContext = createContext();
 
-const MIN_BACKGROUND_MS_TO_LOCK = 3000; // أقل مدة في الخلفية عشان تتحسب "خروج حقيقي" - أقل من كده بيتجاهل (نوافذ نظام سريعة زي البصمة/الموقع/الأذونات)
-
+// ⚠️ قفل التطبيق بالبصمة/رمز الجهاز اتشال بالكامل.
+// السبب: على الموبايلات القديمة نافذة المصادقة كانت بتعلّق التطبيق أو تدخّله في حلقة قفل
+// مفرغة. الحماية الحقيقية لتسجيل الحضور هي الصورة + نطاق الموقع، والاتنين لسه شغالين.
+// appLocked فضلت موجودة وقيمتها false دايمًا عشان باقي الكود ميتكسرش.
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [appLocked, setAppLocked] = useState(false);
-  const appStateRef = useRef(AppState.currentState);
+  const appLocked = false;
   const userRef = useRef(null);
-  const authInProgress = useRef(false);
 
   useEffect(() => {
     userRef.current = user;
@@ -24,49 +24,80 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     loadStoredUser();
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription.remove();
   }, []);
 
   // كل مرة يبقى فيه يوزر مسجل دخول فعليًا وشايف التطبيق (مش قافل بالبصمة) - نسجّل/نحدّث توكن
   // إشعارات الـ Push بتاعه. جهاز الكيوسك المشترك مالوش حساب شخصي فمنسجلوش إشعارات خالص.
   useEffect(() => {
-    if (user && !appLocked && user.role !== 'kiosk') {
+    if (user && user.role !== 'kiosk') {
       registerForPushNotifications();
     }
-  }, [user, appLocked]);
+  }, [user]);
 
-  const handleAppStateChange = async (nextState) => {
-    const previousState = appStateRef.current;
-    appStateRef.current = nextState;
+  // بتتنادى من شاشة تسجيل الحضور - سيبناها كدالة فاضية عشان الشاشة ماتتكسرش
+  const setAuthInProgress = () => {};
 
-    // جهاز الكيوسك المشترك (يوزر المكتب) مبيتقفلش خالص - مفيش شخص واحد بصمته متسجلة عليه
-    if (userRef.current && userRef.current.role === 'kiosk') return;
+  // -------------------------------------------------------------------------
+  // إيقاف الحساب من لوحة التحكم
+  //
+  // السيرفر بيرفض كل طلبات الموظف الموقوف من الأول، بس ده لوحده مكانش بيقفل التطبيق عنده:
+  // بيانات الدخول كانت متخزّنة على الجهاز، فكان بيفضل يفتح التطبيق ويتفرّج على بياناته
+  // القديمة. دلوقتي أول رد من السيرفر بكود ACCOUNT_INACTIVE بيمسح الجلسة فورًا.
+  // -------------------------------------------------------------------------
 
-    // نافذة البصمة/Face ID بتاعة تأكيد الهوية (زي تسجيل الحضور) بتخلي النظام يحس إن التطبيق راح
-    // للخلفية لحظة - ده مش خروج حقيقي، فنتجاهله تمامًا عشان مايفتحش شاشة القفل غلط
-    if (authInProgress.current) return;
+  // بتمسح الجلسة محليًا من غير أي طلب للسيرفر.
+  // ⚠️ مهم إنها متعملش أي طلب: الحساب متوقف أصلًا، فأي طلب هيترفض ويرجّع تشغيل نفس
+  // المعالج ده تاني في حلقة لا نهائية.
+  const clearSession = async () => {
+    try { await cancelCheckOutReminder(); } catch (e) {}
+    await removeToken();
+    await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem('lastBackgroundTime');
+    setUser(null);
+  };
 
-    if (nextState === 'background') {
-      // التطبيق راح للخلفية - نسجل الوقت عشان نقدر نتأكد إنها فترة محسوسة فعلاً لما يرجع
-      await AsyncStorage.setItem('lastBackgroundTime', String(Date.now()));
-    } else if (previousState === 'background' && nextState === 'active') {
-      if (!userRef.current) return;
-      const lastBg = await AsyncStorage.getItem('lastBackgroundTime');
-      const elapsed = lastBg ? Date.now() - Number(lastBg) : 0;
-      // الجلسة متفضلش شغالة من غير تسجيل خروج - بس لازم يأكد هويته بالبصمة تاني كل ما يرجع للتطبيق
-      if (elapsed > MIN_BACKGROUND_MS_TO_LOCK) {
-        setAppLocked(true);
+  // قفل بسيط عشان لو كذا طلب فشل مع بعض ميظهرش كذا رسالة ورا بعض
+  const forcedLogoutInFlight = useRef(false);
+
+  useEffect(() => {
+    setForcedLogoutHandler(async (code) => {
+      if (forcedLogoutInFlight.current) return;
+      if (!userRef.current) return; // مفيش حد مسجّل دخول أصلًا - مفيش حاجة نمسحها
+      // ⚠️ جهاز المكتب (الكيوسك) بره الموضوع ده خالص. توكنه مش مربوط بموظف، فلو مرّ على
+      // راوت عادي هيرجّع TOKEN_INVALID وهنطلّعه من التطبيق غلط - والجهاز ده مشترك ومحدش
+      // حافظ بياناته عشان يرجع يسجّل دخول تاني.
+      if (userRef.current.role === 'kiosk') return;
+      forcedLogoutInFlight.current = true;
+      try {
+        await clearSession();
+        Alert.alert(
+          code === 'ACCOUNT_INACTIVE' ? 'الحساب متوقف' : 'انتهت الجلسة',
+          code === 'ACCOUNT_INACTIVE'
+            ? 'حسابك اتوقف من الإدارة. تواصل مع المسؤول لو ده حصل بالغلط.'
+            : 'برجاء تسجيل الدخول تاني.'
+        );
+      } finally {
+        // بنفضّيه بعد شوية عشان الطلبات اللي كانت طايرة في نفس اللحظة متفتحش رسالة تانية
+        setTimeout(() => { forcedLogoutInFlight.current = false; }, 3000);
       }
-      // لو المدة قليلة جدًا (أقل من العتبة)، متعملش أي حاجة - على الأغلب كانت نافذة نظام سريعة مش خروج حقيقي
-    }
+    });
+  }, []);
+
+  // بنسأل السيرفر "الحساب ده لسه شغال؟" عند فتح التطبيق وكل ما يرجع من الخلفية.
+  // من غير كده الموظف الموقوف مكانش هيتخرّج غير لما يعمل حاجة تحتاج السيرفر.
+  // لو مفيش نت الطلب بيفشل من غير response والمعالج بيتجاهله - مش بنخرّج حد بسبب الشبكة.
+  const verifySession = async () => {
+    if (!userRef.current) return;
+    if (userRef.current.role === 'kiosk') return; // الكيوسك ملوش حساب موظف يتسأل عنه
+    try { await api.get('/auth/me'); } catch (e) {}
   };
 
-  // بتستخدمها أي شاشة هتعمل تأكيد بصمة/Face ID بنفسها (زي شاشة تسجيل الحضور) عشان تحذّر
-  // نظام قفل التطبيق إن أي تغيير حالة جاي دلوقتي سببه نافذة المصادقة نفسها، مش خروج حقيقي
-  const setAuthInProgress = (value) => {
-    authInProgress.current = value;
-  };
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') verifySession();
+    });
+    return () => sub.remove();
+  }, []);
 
   const loadStoredUser = async () => {
     try {
@@ -75,11 +106,8 @@ export const AuthProvider = ({ children }) => {
       if (storedUser && token) {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        // كل مرة يتفتح فيها التطبيق من جديد (Cold start) لازم تأكيد هوية قبل ما يشوف أي حاجة
-        // ما عدا جهاز الكيوسك المشترك (يوزر المكتب) - ده مالوش بصمة شخص واحد متسجلة عليه أصلًا
-        if (parsedUser.role !== 'kiosk') {
-          setAppLocked(true);
-        }
+        userRef.current = parsedUser; // بنحدّثها فورًا عشان verifySession اللي جاية تلاقيها
+        verifySession();
       }
     } catch (e) {
       console.log('خطأ في تحميل بيانات المستخدم', e);
@@ -90,15 +118,21 @@ export const AuthProvider = ({ children }) => {
 
   // تسجيل الدخول بقى برقم الهاتف بدل الإيميل
   const login = async (phone, password) => {
-    const { data } = await api.post('/auth/login', { phone, password });
+    // rememberMe: true دايمًا هنا - ده تطبيق متركّب على موبايل الموظف الشخصي،
+    // مش متصفح على جهاز مشترك، فمفيش سبب يخرّجه كل أسبوع ويخليه يكتب كلمة السر تاني.
+    // السيرفر بيدّي توكن ٩٠ يوم، وإيقاف الحساب لسه بيقفله فورًا مهما كانت المدة.
+    const { data } = await api.post('/auth/login', { phone, password, rememberMe: true });
     await setToken(data.token);
     await AsyncStorage.setItem('user', JSON.stringify(data));
     setUser(data);
-    setAppLocked(false);
     return data;
   };
 
   const logout = async () => {
+    // بنقفل معالج الخروج الإجباري وإحنا بنسجّل خروج بإرادتنا: لو الحساب كان متوقف أصلًا،
+    // طلب مسح توكن الإشعارات تحت هيترفض وهتطلع رسالة "الحساب متوقف" في وش حد لسه دايس خروج
+    forcedLogoutInFlight.current = true;
+
     // نمسح توكن الإشعارات من السيرفر الأول (وإحنا لسه معانا التوكن اللي بيسمحلنا نعمل الطلب ده)
     // عشان الجهاز ده يوقف يستقبل إشعارات مرتبطة بالحساب بعد ما اليوزر يسجل خروج منه
     if (userRef.current && userRef.current.role !== 'kiosk') {
@@ -108,77 +142,8 @@ export const AuthProvider = ({ children }) => {
         // مش مشكلة لو فشل (مفيش نت مثلًا) - مش هيمنع تسجيل الخروج نفسه
       }
     }
-    await removeToken();
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('lastBackgroundTime');
-    setUser(null);
-    setAppLocked(false);
-  };
-
-  // بيطلب تأكيد الهوية بالبصمة/Face ID، ولو مش متسجلين على الجهاز بيرجع تلقائي لكود/نقش قفل الشاشة
-  const unlockApp = async () => {
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!hasHardware || !isEnrolled) {
-        // مفيش بصمة/Face ID أو حتى قفل شاشة متسجل على الجهاز - نفتح عادي من غير ما نعطّله
-        setAppLocked(false);
-        return true;
-      }
-      // نافذة تأكيد الهوية دي ممكن تاخد التطبيق للخلفية لحظة (خصوصًا لو المستخدم استخدم رمز الجهاز كبديل
-      // للبصمة) - لازم نحذّر نظام القفل إن ده مش خروج حقيقي، وإلا هيفضل يعيد قفل التطبيق في حلقة مفرغة
-      setAuthInProgress(true);
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'أكّد هويتك لفتح التطبيق',
-        fallbackLabel: 'استخدم كلمة مرور الجهاز',
-        disableDeviceFallback: false
-      });
-      setAuthInProgress(false);
-      if (result.success) {
-        setAppLocked(false);
-        return true;
-      }
-      return false;
-    } catch (e) {
-      console.log('خطأ في المصادقة المحلية', e);
-      setAuthInProgress(false);
-      return false;
-    }
-  };
-
-  // زرار "تسجيل بالبصمة" على شاشة الدخول نفسها - لو فيه جلسة محفوظة (توكن قديم)، بيرجّعها بعد تأكيد الهوية
-  // من غير ما يحتاج يكتب رقم الهاتف وكلمة المرور تاني
-  const loginWithBiometrics = async () => {
-    const storedUser = await AsyncStorage.getItem('user');
-    const token = await getToken();
-    if (!storedUser || !token) {
-      return { success: false, message: 'مفيش جلسة محفوظة على الجهاز ده - سجل الدخول برقم الهاتف وكلمة المرور الأول' };
-    }
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!hasHardware || !isEnrolled) {
-        return { success: false, message: 'مفيش بصمة أو Face ID متسجلة على الجهاز ده' };
-      }
-      // نفس التحذير هنا كمان - نافذة المصادقة ممكن تاخد التطبيق للخلفية لحظة، مش خروج حقيقي
-      setAuthInProgress(true);
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'أكّد هويتك للدخول',
-        fallbackLabel: 'استخدم كلمة مرور الجهاز',
-        disableDeviceFallback: false
-      });
-      setAuthInProgress(false);
-      if (result.success) {
-        setUser(JSON.parse(storedUser));
-        setAppLocked(false);
-        return { success: true };
-      }
-      return { success: false, message: 'فشلت المصادقة' };
-    } catch (e) {
-      console.log('خطأ في تسجيل الدخول بالبصمة', e);
-      setAuthInProgress(false);
-      return { success: false, message: 'حدث خطأ أثناء المصادقة' };
-    }
+    await clearSession();
+    setTimeout(() => { forcedLogoutInFlight.current = false; }, 3000);
   };
 
   // بتحدّث بيانات اليوزر المحفوظة محليًا (زي بعد ما يغيّر صورته الشخصية) من غير ما يحتاج يسجل دخول تاني
@@ -188,26 +153,8 @@ export const AuthProvider = ({ children }) => {
     setUser(updated);
   };
 
-  // طريقة بديلة لفتح التطبيق - بكلمة مرور الحساب نفسه بدل البصمة/رمز الجهاز، لأجهزة معينة بيبقى فيها
-  // نظام البصمة/الرمز غير مستقر (بيدخل في حلقة قفل مفرغة) - دي وسيلة احتياطية مضمونة تشتغل في كل الحالات
-  const unlockWithPassword = async (password) => {
-    try {
-      if (!userRef.current?.phone) {
-        return { success: false, message: 'تعذر التحقق من الحساب' };
-      }
-      const { data } = await api.post('/auth/login', { phone: userRef.current.phone, password });
-      await setToken(data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(data));
-      setUser(data);
-      setAppLocked(false);
-      return { success: true };
-    } catch (e) {
-      return { success: false, message: e.response?.data?.message || 'كلمة المرور غير صحيحة' };
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ user, loading, appLocked, login, logout, unlockApp, unlockWithPassword, loginWithBiometrics, setAuthInProgress, updateUserFields }}>
+    <AuthContext.Provider value={{ user, loading, appLocked, login, logout, setAuthInProgress, updateUserFields }}>
       {children}
     </AuthContext.Provider>
   );

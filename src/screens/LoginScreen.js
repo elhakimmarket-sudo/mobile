@@ -25,11 +25,10 @@ const WELCOME_MESSAGES = [
 ];
 
 export default function LoginScreen() {
-  const { login, loginWithBiometrics } = useAuth();
+  const { login } = useAuth();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [bioLoading, setBioLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!phone || !password) {
@@ -46,15 +45,6 @@ export default function LoginScreen() {
       Alert.alert('خطأ', msg);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleBiometricLogin = async () => {
-    setBioLoading(true);
-    const result = await loginWithBiometrics();
-    setBioLoading(false);
-    if (!result.success) {
-      Alert.alert('تنبيه', result.message || 'تعذر تسجيل الدخول بالبصمة');
     }
   };
 
@@ -99,17 +89,6 @@ export default function LoginScreen() {
 
           <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>دخول</Text>}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin} disabled={bioLoading}>
-            {bioLoading ? (
-              <ActivityIndicator color="#2F80ED" />
-            ) : (
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="finger-print-outline" size={16} color="#2F80ED" />
-                <Text style={styles.biometricBtnText}>تسجيل بالبصمة</Text>
-              </View>
-            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

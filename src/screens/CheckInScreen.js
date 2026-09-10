@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../context/AuthContext';
@@ -64,20 +63,8 @@ export default function CheckInScreen({ route, navigation }) {
       return;
     }
 
-    // تأكيد الهوية بالبصمة أو Face ID - لو مش متفعّلين على الموبايل، بيرجع تلقائي لكلمة مرور/نقش قفل الشاشة
-    // نحذّر نظام قفل التطبيق الأول إن التغيير الجاي في حالة التطبيق سببه نافذة المصادقة دي، مش خروج حقيقي
-    setAuthInProgress(true);
-    const authResult = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'أكد هويتك للمتابعة',
-      cancelLabel: 'إلغاء',
-      disableDeviceFallback: false
-    });
-    setAuthInProgress(false);
-
-    if (!authResult.success) {
-      Alert.alert('تنبيه', 'لازم تأكد هويتك عشان تكمل تسجيل الحضور/الانصراف');
-      return;
-    }
+    // ⚠️ تأكيد الهوية بالبصمة اتشال - كان بيعلّق الموبايلات القديمة.
+    // إثبات الهوية بقى بالصورة + التأكد إن الموظف جوه نطاق مقر العمل.
 
     setLoading(true);
     try {
