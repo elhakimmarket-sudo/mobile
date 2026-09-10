@@ -1,17 +1,18 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, RefreshControl,
+  View, Text, StyleSheet, RefreshControl, KeyboardAvoidingView, Platform,
   TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, ScrollView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '../services/api';
-import { CARD_SHADOW } from '../theme/colors';
+import { COLORS, CARD_SHADOW, FIELD_SHADOW } from '../theme/colors';
 
 const advanceStatusLabels = {
-  pending: { text: 'قيد الانتظار', color: '#b46a00', bg: '#fff3e0' },
-  approved: { text: 'موافق عليها', color: '#1e7e34', bg: '#e6f4ea' },
-  rejected: { text: 'مرفوضة', color: '#9c0c23', bg: '#fdecea' }
+  pending: { text: 'قيد الانتظار', color: COLORS.warningText, bg: COLORS.warningBg },
+  approved: { text: 'موافق عليها', color: COLORS.successText, bg: COLORS.successBg },
+  rejected: { text: 'مرفوضة', color: COLORS.dangerText, bg: COLORS.dangerBg }
 };
 
 const monthNames = [
@@ -28,6 +29,7 @@ export default function LoanScreen() {
 
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [focused, setFocused] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -53,6 +55,12 @@ export default function LoanScreen() {
   const resetForm = () => {
     setAmount('');
     setReason('');
+    setFocused(null);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    resetForm();
   };
 
   const submitAdvance = async () => {
@@ -67,14 +75,12 @@ export default function LoanScreen() {
         reason
       });
       Alert.alert('تم', data.message);
-      setModalVisible(false);
-      resetForm();
+      closeModal();
       fetchData();
     } catch (error) {
       // لو اترفض تلقائيًا بسبب الرصيد، السيرفر بيرجع الرسالة والسبب في نفس الوقت
       Alert.alert('تنبيه', error.response?.data?.message || 'حدث خطأ أثناء إرسال الطلب');
-      setModalVisible(false);
-      resetForm();
+      closeModal();
       fetchData();
     } finally {
       setSubmitting(false);
@@ -84,10 +90,16 @@ export default function LoanScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {advances.length === 0 && <Text style={styles.empty}>لا يوجد طلبات سلف بعد</Text>}
+        {advances.length === 0 && (
+          <View style={styles.emptyBox}>
+            <Ionicons name="card-outline" size={30} color={COLORS.gray} />
+            <Text style={styles.emptyText}>لسه مفيش طلبات سلف</Text>
+          </View>
+        )}
+
         {advances.map((a) => {
           const st = advanceStatusLabels[a.status] || advanceStatusLabels.pending;
           return (
@@ -108,75 +120,172 @@ export default function LoanScreen() {
         })}
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
-        <Text style={styles.fabText}>+ طلب سلفة</Text>
+      <TouchableOpacity style={[styles.fab, { bottom: 16 + insets.bottom }]} onPress={() => setModalVisible(true)}>
+        <Ionicons name="add" size={19} color={COLORS.white} />
+        <Text style={styles.fabText}>طلب سلفة</Text>
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalBox, { paddingBottom: 20 + insets.bottom }]}>
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeModal}>
+        {/* ⚠️ من غير KeyboardAvoidingView الكيبورد بيطلع فوق الحقول والزراير والموظف
+            مش شايف اللي بيكتبه. النافذة ملزوقة في تحت (justifyContent: flex-end)
+            فلازم ترتفع مع الكيبورد بدل ما تفضل مكانها. */}
+        {/* behavior على أندرويد: 'height' مش undefined.
+            السبب: النافذة على أندرويد بتترسم في نافذة نظام منفصلة، وساعات مبتاخدش
+            الـ adjustResize بتاع التطبيق. 'height' بيقيس الكيبورد بنفسه فبيشتغل في
+            الحالتين. أسوأ حالة إنه يضغط النافذة شوية - والتمرير اللي جواها بيغطي ده،
+            وده أرحم بكتير من إن الكيبورد يغطي الحقول تاني. */}
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          {/* ضغطة على المساحة الغامقة بتقفل - سلوك متوقع في أي نافذة سفلية */}
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={closeModal} />
+
+          <View style={[styles.modalBox, { paddingBottom: 16 + insets.bottom }]}>
+            <View style={styles.grabber} />
             <Text style={styles.modalTitle}>طلب سلفة جديدة</Text>
 
-            <Text style={styles.label}>المبلغ المطلوب (جنيه)</Text>
-            <TextInput style={styles.input} keyboardType="numeric" value={amount} onChangeText={setAmount} placeholder="1000" />
+            {/* التمرير هنا هو خط الدفاع التاني: على أندرويد بنعتمد على
+                windowSoftInputMode، ولو المساحة فضلت ضيقة الموظف يقدر يمرّر للحقل */}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Text style={styles.label}>المبلغ المطلوب (جنيه)</Text>
+              <View style={[styles.field, focused === 'amount' && styles.fieldFocused]}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="numeric"
+                  value={amount}
+                  onChangeText={setAmount}
+                  onFocus={() => setFocused('amount')}
+                  onBlur={() => setFocused(null)}
+                  placeholder="1000"
+                  placeholderTextColor="#B6BDC9"
+                  textAlign="right"
+                />
+              </View>
 
-            <Text style={styles.label}>السبب (اختياري)</Text>
-            <TextInput
-              style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-              value={reason}
-              onChangeText={setReason}
-              multiline
-              placeholder="اكتب سبب طلب السلفة..."
-            />
+              <Text style={styles.label}>السبب (اختياري)</Text>
+              <View style={[styles.field, focused === 'reason' && styles.fieldFocused]}>
+                <TextInput
+                  style={[styles.input, styles.inputMultiline]}
+                  value={reason}
+                  onChangeText={setReason}
+                  onFocus={() => setFocused('reason')}
+                  onBlur={() => setFocused(null)}
+                  multiline
+                  placeholder="اكتب سبب طلب السلفة..."
+                  placeholderTextColor="#B6BDC9"
+                  textAlign="right"
+                  textAlignVertical="top"
+                />
+              </View>
 
-            <Text style={styles.hintText}>هتتخصم بالكامل من راتب الشهر الحالي، وهتترفض تلقائيًا لو تجاوزت رصيدك المتاح.</Text>
+              <View style={styles.hintBox}>
+                <Ionicons name="information-circle-outline" size={15} color={COLORS.infoText} />
+                <Text style={styles.hintText}>
+                  هتتخصم بالكامل من راتب الشهر الحالي، وهتترفض تلقائيًا لو تجاوزت رصيدك المتاح.
+                </Text>
+              </View>
+            </ScrollView>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setModalVisible(false); resetForm(); }}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
                 <Text style={styles.cancelBtnText}>إلغاء</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.submitBtn} onPress={submitAdvance} disabled={submitting}>
-                {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>إرسال الطلب</Text>}
+                {submitting ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.submitBtnText}>إرسال الطلب</Text>}
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, ...CARD_SHADOW },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+
+  card: { backgroundColor: COLORS.white, borderRadius: 12, padding: 14, marginBottom: 12, ...CARD_SHADOW },
   cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  amountText: { fontSize: 16, fontWeight: 'bold', color: '#111111' },
+  amountText: { fontSize: 16, fontWeight: 'bold', color: COLORS.black },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgeText: { fontSize: 12, fontWeight: '600' },
-  detailText: { fontSize: 13, color: '#555', textAlign: 'right', marginTop: 2 },
-  reasonText: { fontSize: 13, color: '#777', textAlign: 'right', marginTop: 6 },
-  rejectNote: { fontSize: 12, color: '#9c0c23', textAlign: 'right', marginTop: 6 },
-  empty: { textAlign: 'center', color: '#888', marginBottom: 16 },
+  detailText: { fontSize: 13, color: COLORS.label, textAlign: 'right', marginTop: 2 },
+  reasonText: { fontSize: 13, color: COLORS.textMuted, textAlign: 'right', marginTop: 6 },
+  rejectNote: { fontSize: 12, color: COLORS.dangerText, textAlign: 'right', marginTop: 6 },
+
+  emptyBox: { alignItems: 'center', paddingVertical: 50, gap: 10 },
+  emptyText: { textAlign: 'center', color: COLORS.gray, fontSize: 14 },
 
   fab: {
-    position: 'absolute', bottom: 20, left: 20, right: 20,
-    backgroundColor: '#2F80ED', padding: 16, borderRadius: 30, alignItems: 'center', elevation: 4,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6
+    position: 'absolute', left: 16, right: 16,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 15,
+    borderRadius: 16,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    elevation: 4,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10
   },
-  fabText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  fabText: { color: COLORS.white, fontWeight: '800', fontSize: 15 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'right', marginBottom: 16, color: '#111111' },
-  label: { fontSize: 13, color: '#555', textAlign: 'right', marginBottom: 6, marginTop: 10 },
-  input: {
-    backgroundColor: '#F5F7FA', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#DDD', textAlign: 'right', fontSize: 14
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,23,41,0.5)' },
+
+  modalBox: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    maxHeight: '88%'
   },
-  hintText: { fontSize: 12, color: '#999', textAlign: 'right', marginTop: 10 },
-  modalActions: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginTop: 20, gap: 10 },
-  cancelBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#F5F7FA', alignItems: 'center' },
-  cancelBtnText: { color: '#555' },
-  submitBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#2F80ED', alignItems: 'center' },
-  submitBtnText: { color: '#fff', fontWeight: 'bold' }
+  grabber: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: '#D6DBE4',
+    alignSelf: 'center',
+    marginBottom: 14
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', textAlign: 'right', marginBottom: 18, color: COLORS.black },
+
+  label: { fontSize: 12.5, fontWeight: '600', color: COLORS.label, textAlign: 'right', marginBottom: 7 },
+
+  field: {
+    backgroundColor: COLORS.white,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    ...FIELD_SHADOW
+  },
+  fieldFocused: { borderColor: COLORS.primary },
+  input: { paddingVertical: 13, fontSize: 15, color: COLORS.black },
+  inputMultiline: { minHeight: 78, paddingTop: 13 },
+
+  hintBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: COLORS.infoBg,
+    borderRadius: 11,
+    padding: 12,
+    marginBottom: 4
+  },
+  hintText: { flex: 1, fontSize: 12, color: COLORS.infoText, textAlign: 'right', lineHeight: 19 },
+
+  modalActions: { flexDirection: 'row-reverse', marginTop: 16, gap: 10 },
+  cancelBtn: { flex: 1, paddingVertical: 15, borderRadius: 13, backgroundColor: COLORS.grayLight, alignItems: 'center' },
+  cancelBtnText: { color: COLORS.label, fontWeight: '700', fontSize: 14.5 },
+  submitBtn: { flex: 1.4, paddingVertical: 15, borderRadius: 13, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', minHeight: 50 },
+  submitBtnText: { color: COLORS.white, fontWeight: '800', fontSize: 14.5 }
 });

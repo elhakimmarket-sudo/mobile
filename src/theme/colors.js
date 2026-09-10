@@ -3,6 +3,9 @@
 export const COLORS = {
   primary: '#2F80ED',
   primaryDark: '#185FA5',
+  // كحلي غامق - زرار الإجراء الأساسي في الشاشات الفاتحة (شاشة الدخول).
+  // أغمق من primary عشان يفضل واضح في شمس الضهر، والموظفين بيمضوا وهما واقفين برة.
+  navy: '#143A73',
   black: '#111111',
   bg: '#F5F7FA',
   white: '#ffffff',
@@ -10,6 +13,8 @@ export const COLORS = {
   gray: '#999999',
   grayLight: '#f0f0f0',
   textMuted: '#777777',
+  // رمادي أغمق شوية للعناوين الصغيرة فوق الحقول - #999 كان خفيف أوي عليها
+  label: '#6B7688',
 
   successBg: '#e6f4ea',
   successText: '#1e7e34',
@@ -29,4 +34,13 @@ export const CARD_SHADOW = {
   shadowOffset: { width: 0, height: 1 },
   shadowOpacity: 0.06,
   shadowRadius: 3
+};
+
+// ظل أخف من بتاع الكروت - للحقول اللي عايمة على الخلفية من غير إطار ظاهر
+export const FIELD_SHADOW = {
+  elevation: 1,
+  shadowColor: '#101828',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.07,
+  shadowRadius: 5
 };

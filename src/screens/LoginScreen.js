@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../context/AuthContext';
+import { COLORS, FIELD_SHADOW } from '../theme/colors';
 
 // رسائل ترحيب بتتغير عشوائيًا في كل مرة يسجل فيها الموظف دخول
 const WELCOME_MESSAGES = [
@@ -29,6 +30,12 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // الحقل اللي المؤشر فيه دلوقتي - عشان نلوّن إطاره. React Native ملوش :focus
+  // زي الويب، فلازم نمسك الحالة بإيدنا.
+  const [focused, setFocused] = useState(null);
 
   const handleLogin = async () => {
     if (!phone || !password) {
@@ -37,7 +44,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      await login(phone.trim(), password);
+      await login(phone.trim(), password, rememberMe);
       const message = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)];
       Alert.alert('أهلاً بيك', message);
     } catch (error) {
@@ -48,103 +55,172 @@ export default function LoginScreen() {
     }
   };
 
+  // ⚠️ متعملش من الحقل ده كومبوننت جوه الدالة دي. React بيعتبره نوع جديد كل مرة
+  // الشاشة تترسم، فبيهدّه ويبنيه من الأول - والنتيجة إن الكيبورد بيتقفل بعد كل حرف.
+  // مكرر مرتين بإيدنا وده أأمن.
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.loginBox}>
-          <View style={styles.brandMark}>
-            <Image source={require('../../assets/logo.jpg')} style={styles.logoImage} />
-          </View>
+        <View style={styles.logoWrap}>
+          <Image source={require('../../assets/logo.jpg')} style={styles.logo} resizeMode="cover" />
+        </View>
 
-          <Text style={styles.title}>Elhakim HR System</Text>
-          <Text style={styles.subtitle}>تسجيل الدخول</Text>
+        <Text style={styles.brand}>الحكيم</Text>
+        <Text style={styles.tagline}>نظام الحضور والانصراف</Text>
 
-          <Text style={styles.label}>رقم الهاتف</Text>
+        <Text style={styles.label}>رقم الهاتف</Text>
+        <View style={[styles.field, focused === 'phone' && styles.fieldFocused]}>
+          <Ionicons
+            name="call-outline"
+            size={17}
+            color={focused === 'phone' ? COLORS.primary : COLORS.gray}
+          />
           <TextInput
             style={styles.input}
-            placeholder="رقم الهاتف"
+            placeholder="01xxxxxxxxx"
+            placeholderTextColor="#B6BDC9"
             value={phone}
             onChangeText={setPhone}
+            onFocus={() => setFocused('phone')}
+            onBlur={() => setFocused(null)}
             keyboardType="phone-pad"
             textAlign="right"
+            autoComplete="tel"
+            returnKeyType="next"
           />
+        </View>
 
-          <Text style={styles.label}>كلمة المرور</Text>
+        <Text style={styles.label}>كلمة المرور</Text>
+        <View style={[styles.field, focused === 'password' && styles.fieldFocused]}>
+          <Ionicons
+            name="lock-closed-outline"
+            size={17}
+            color={focused === 'password' ? COLORS.primary : COLORS.gray}
+          />
           <TextInput
             style={styles.input}
-            placeholder="كلمة المرور"
+            placeholder="••••••••"
+            placeholderTextColor="#B6BDC9"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
+            onFocus={() => setFocused('password')}
+            onBlur={() => setFocused(null)}
+            secureTextEntry={!showPassword}
             textAlign="right"
+            autoComplete="password"
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
           />
-
-          <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>دخول</Text>}
+          <TouchableOpacity
+            onPress={() => setShowPassword((v) => !v)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={COLORS.gray} />
           </TouchableOpacity>
         </View>
+
+        {/* مفعّل افتراضيًا: ده موبايل الموظف الشخصي، مش جهاز مشترك.
+            بيخلي السيرفر يدّي جلسة ٩٠ يوم بدل ٧ - مش بيخزّن كلمة السر في أي مكان. */}
+        <TouchableOpacity
+          style={styles.rememberRow}
+          onPress={() => setRememberMe((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.checkbox, rememberMe && styles.checkboxOn]}>
+            {rememberMe && <Ionicons name="checkmark" size={12} color={COLORS.white} />}
+          </View>
+          <Text style={styles.rememberText}>خليني مسجّل دخول</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleLogin}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>دخول</Text>}
+        </TouchableOpacity>
+
+        <Text style={styles.footerNote}>نسيت كلمة المرور؟ كلّم الإدارة</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111111' },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  loginBox: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 28,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8
-  },
-  brandMark: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  // justifyContent: center بيوسّط الفورم رأسيًا لما فيه مساحة، و flexGrow بيخلي
+  // الـ ScrollView يشتغل عادي لما الكيبورد يطلع ويضيّق المساحة
+  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 26, paddingVertical: 32 },
+
+  logoWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 22,
     overflow: 'hidden',
     alignSelf: 'center',
-    marginBottom: 14,
-    backgroundColor: '#F5F7FA'
+    marginBottom: 18,
+    backgroundColor: COLORS.white,
+    ...FIELD_SHADOW,
+    shadowOpacity: 0.13,
+    shadowRadius: 12,
+    elevation: 4
   },
-  logoImage: { width: '100%', height: '100%' },
-  title: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', color: '#111111' },
-  subtitle: { fontSize: 14, textAlign: 'center', color: '#777', marginBottom: 20, marginTop: 4 },
-  label: { fontSize: 13, color: '#444444', textAlign: 'right', marginBottom: 6, marginTop: 10 },
-  input: {
-    backgroundColor: '#F5F7FA',
-    borderRadius: 8,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    fontSize: 15
+  logo: { width: '100%', height: '100%' },
+
+  brand: { fontSize: 27, fontWeight: '900', textAlign: 'center', color: COLORS.black, letterSpacing: -0.3 },
+  tagline: { fontSize: 13, textAlign: 'center', color: COLORS.label, marginTop: 3, marginBottom: 30 },
+
+  label: { fontSize: 12.5, fontWeight: '600', color: COLORS.label, textAlign: 'right', marginBottom: 7 },
+
+  // الحقل عايم على الخلفية بظل خفيف بدل الإطار الرمادي - ده أساس شكل "النهار"
+  field: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: COLORS.white,
+    borderRadius: 13,
+    paddingHorizontal: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    marginBottom: 16,
+    ...FIELD_SHADOW
   },
+  fieldFocused: { borderColor: COLORS.primary },
+  input: { flex: 1, paddingVertical: 14, fontSize: 15, color: COLORS.black },
+
+  rememberRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginTop: 2, marginBottom: 22 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#C6CDD9',
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  checkboxOn: { backgroundColor: COLORS.navy, borderColor: COLORS.navy },
+  rememberText: { fontSize: 13.5, color: COLORS.label },
+
   button: {
-    backgroundColor: '#2F80ED',
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: COLORS.navy,
+    paddingVertical: 16,
+    borderRadius: 14,
     alignItems: 'center',
-    marginTop: 22
+    justifyContent: 'center',
+    minHeight: 54
   },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  biometricBtn: {
-    borderWidth: 1,
-    borderColor: '#2F80ED',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 12
-  },
-  biometricBtnText: { color: '#2F80ED', fontSize: 15, fontWeight: 'bold' }
+  buttonDisabled: { opacity: 0.7 },
+  buttonText: { color: COLORS.white, fontSize: 16, fontWeight: '800' },
+
+  footerNote: { fontSize: 12.5, color: COLORS.gray, textAlign: 'center', marginTop: 18 }
 });

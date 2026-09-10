@@ -1,13 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, RefreshControl,
-  TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, Platform
+  View, Text, StyleSheet, FlatList, RefreshControl, KeyboardAvoidingView,
+  TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, Platform, ScrollView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '../services/api';
-import { CARD_SHADOW } from '../theme/colors';
+import { COLORS, CARD_SHADOW, FIELD_SHADOW } from '../theme/colors';
 
 const typeLabels = {
   paid: 'إجازة مدفوعة',
@@ -15,9 +16,9 @@ const typeLabels = {
 };
 
 const statusLabels = {
-  pending: { text: 'قيد الانتظار', color: '#b46a00', bg: '#fff3e0' },
-  approved: { text: 'تمت الموافقة', color: '#1e7e34', bg: '#e6f4ea' },
-  rejected: { text: 'مرفوض', color: '#9c0c23', bg: '#fdecea' }
+  pending: { text: 'قيد الانتظار', color: COLORS.warningText, bg: COLORS.warningBg },
+  approved: { text: 'تمت الموافقة', color: COLORS.successText, bg: COLORS.successBg },
+  rejected: { text: 'مرفوض', color: COLORS.dangerText, bg: COLORS.dangerBg }
 };
 
 // بتحول Date لصيغة YYYY-MM-DD اللي السيرفر مستنيها
@@ -40,8 +41,8 @@ export default function LeaveScreen() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
+  const [reasonFocused, setReasonFocused] = useState(false);
 
-  // بتفضل مضبوطة على النهاردة (الشهر والسنة الحاليين) لحد ما المستخدم يختار تاريخ تاني
   const [startDateObj, setStartDateObj] = useState(new Date());
   const [endDateObj, setEndDateObj] = useState(new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -80,10 +81,18 @@ export default function LeaveScreen() {
     setStartDate('');
     setEndDate('');
     setReason('');
+    setReasonFocused(false);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setShowStartPicker(false);
+    setShowEndPicker(false);
+    resetForm();
   };
 
   const onChangeStartDate = (event, selected) => {
-    setShowStartPicker(Platform.OS === 'ios'); // في iOS التقويم بيفضل ظاهر لحد ما تدوسي تم
+    setShowStartPicker(Platform.OS === 'ios'); // في iOS التقويم بيفضل ظاهر لحد ما تدوس تم
     if (selected) {
       setStartDateObj(selected);
       setStartDate(formatDateYMD(selected));
@@ -100,15 +109,18 @@ export default function LeaveScreen() {
 
   const submitLeave = async () => {
     if (!startDate || !endDate) {
-      Alert.alert('تنبيه', 'من فضلك اختاري تاريخ البداية والنهاية');
+      Alert.alert('تنبيه', 'من فضلك اختار تاريخ البداية والنهاية');
+      return;
+    }
+    if (endDate < startDate) {
+      Alert.alert('تنبيه', 'تاريخ النهاية لازم يكون بعد تاريخ البداية');
       return;
     }
     setSubmitting(true);
     try {
       await api.post('/leave', { type, startDate, endDate, reason });
       Alert.alert('تم', 'تم إرسال طلب الإجازة بنجاح، في انتظار موافقة الإدارة');
-      setModalVisible(false);
-      resetForm();
+      closeModal();
       fetchData();
     } catch (error) {
       Alert.alert('خطأ', error.response?.data?.message || 'حدث خطأ أثناء إرسال الطلب');
@@ -147,141 +159,211 @@ export default function LeaveScreen() {
           balance && (
             <View style={styles.balanceCard}>
               <Text style={styles.balanceValue}>{balance.remaining} يوم</Text>
-              <Text style={styles.balanceLabel}>رصيدك المتبقي من الإجازة المدفوعة هذا الشهر (من أصل {balance.allowance})</Text>
+              <Text style={styles.balanceLabel}>
+                رصيدك المتبقي من الإجازة المدفوعة الشهر ده (من أصل {balance.allowance})
+              </Text>
             </View>
           )
         }
-        ListEmptyComponent={<Text style={styles.empty}>لا يوجد طلبات إجازة بعد</Text>}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        ListEmptyComponent={
+          <View style={styles.emptyBox}>
+            <Ionicons name="sunny-outline" size={30} color={COLORS.gray} />
+            <Text style={styles.empty}>لسه مفيش طلبات إجازة</Text>
+          </View>
+        }
+        contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
       />
 
-      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
-        <Text style={styles.fabText}>+ طلب إجازة</Text>
+      <TouchableOpacity style={[styles.fab, { bottom: 16 + insets.bottom }]} onPress={() => setModalVisible(true)}>
+        <Ionicons name="add" size={19} color={COLORS.white} />
+        <Text style={styles.fabText}>طلب إجازة</Text>
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalBox, { paddingBottom: 20 + insets.bottom }]}>
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeModal}>
+        {/* ⚠️ من غير KeyboardAvoidingView الكيبورد بيطلع فوق حقل السبب والزراير.
+            النافذة ملزوقة في تحت فلازم ترتفع معاه بدل ما تفضل مكانها. */}
+        {/* behavior على أندرويد: 'height' مش undefined.
+            السبب: النافذة على أندرويد بتترسم في نافذة نظام منفصلة، وساعات مبتاخدش
+            الـ adjustResize بتاع التطبيق. 'height' بيقيس الكيبورد بنفسه فبيشتغل في
+            الحالتين. أسوأ حالة إنه يضغط النافذة شوية - والتمرير اللي جواها بيغطي ده،
+            وده أرحم بكتير من إن الكيبورد يغطي الحقول تاني. */}
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={closeModal} />
+
+          <View style={[styles.modalBox, { paddingBottom: 16 + insets.bottom }]}>
+            <View style={styles.grabber} />
             <Text style={styles.modalTitle}>طلب إجازة جديد</Text>
 
-            <Text style={styles.label}>نوع الإجازة</Text>
-            <View style={styles.typeRow}>
-              {Object.entries(typeLabels).map(([key, label]) => (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.typeChip, type === key && styles.typeChipActive]}
-                  onPress={() => setType(key)}
-                >
-                  <Text style={[styles.typeChipText, type === key && styles.typeChipTextActive]}>{label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
+              <Text style={styles.label}>نوع الإجازة</Text>
+              <View style={styles.typeRow}>
+                {Object.entries(typeLabels).map(([key, label]) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.typeChip, type === key && styles.typeChipActive]}
+                    onPress={() => setType(key)}
+                  >
+                    <Text style={[styles.typeChipText, type === key && styles.typeChipTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <Text style={styles.label}>تاريخ البداية</Text>
-            <TouchableOpacity style={styles.dateButton} onPress={() => setShowStartPicker(true)}>
-              <Text style={startDate ? styles.dateValueText : styles.datePlaceholderText}>
-                {startDate || 'اختاري التاريخ'}
-              </Text>
-            </TouchableOpacity>
-            {showStartPicker && (
-              <DateTimePicker
-                value={startDateObj}
-                mode="date"
-                display="default"
-                onChange={onChangeStartDate}
-              />
-            )}
+              <Text style={styles.label}>تاريخ البداية</Text>
+              <TouchableOpacity style={styles.dateButton} onPress={() => setShowStartPicker(true)}>
+                <Text style={startDate ? styles.dateValueText : styles.datePlaceholderText}>
+                  {startDate || 'اختار التاريخ'}
+                </Text>
+                <Ionicons name="calendar-outline" size={17} color={COLORS.gray} />
+              </TouchableOpacity>
+              {showStartPicker && (
+                <DateTimePicker value={startDateObj} mode="date" display="default" onChange={onChangeStartDate} />
+              )}
 
-            <Text style={styles.label}>تاريخ النهاية</Text>
-            <TouchableOpacity style={styles.dateButton} onPress={() => setShowEndPicker(true)}>
-              <Text style={endDate ? styles.dateValueText : styles.datePlaceholderText}>
-                {endDate || 'اختاري التاريخ'}
-              </Text>
-            </TouchableOpacity>
-            {showEndPicker && (
-              <DateTimePicker
-                value={endDateObj}
-                mode="date"
-                display="default"
-                onChange={onChangeEndDate}
-              />
-            )}
+              <Text style={styles.label}>تاريخ النهاية</Text>
+              <TouchableOpacity style={styles.dateButton} onPress={() => setShowEndPicker(true)}>
+                <Text style={endDate ? styles.dateValueText : styles.datePlaceholderText}>
+                  {endDate || 'اختار التاريخ'}
+                </Text>
+                <Ionicons name="calendar-outline" size={17} color={COLORS.gray} />
+              </TouchableOpacity>
+              {showEndPicker && (
+                <DateTimePicker value={endDateObj} mode="date" display="default" onChange={onChangeEndDate} />
+              )}
 
-            <Text style={styles.label}>السبب (اختياري)</Text>
-            <TextInput
-              style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-              placeholder="اكتب سبب الإجازة..."
-              value={reason}
-              onChangeText={setReason}
-              multiline
-            />
+              <Text style={styles.label}>السبب (اختياري)</Text>
+              <View style={[styles.field, reasonFocused && styles.fieldFocused]}>
+                <TextInput
+                  style={[styles.input, styles.inputMultiline]}
+                  placeholder="اكتب سبب الإجازة..."
+                  placeholderTextColor="#B6BDC9"
+                  value={reason}
+                  onChangeText={setReason}
+                  onFocus={() => setReasonFocused(true)}
+                  onBlur={() => setReasonFocused(false)}
+                  multiline
+                  textAlign="right"
+                  textAlignVertical="top"
+                />
+              </View>
+            </ScrollView>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setModalVisible(false); resetForm(); }}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
                 <Text style={styles.cancelBtnText}>إلغاء</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.submitBtn} onPress={submitLeave} disabled={submitting}>
-                {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>إرسال الطلب</Text>}
+                {submitting ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.submitBtnText}>إرسال الطلب</Text>}
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+
   balanceCard: {
-    backgroundColor: '#111111', borderRadius: 12, padding: 16,
-    marginBottom: 14, alignItems: 'flex-end'
+    backgroundColor: COLORS.primary, borderRadius: 14, padding: 18,
+    marginBottom: 14, alignItems: 'center'
   },
-  balanceValue: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  balanceLabel: { color: '#ccc', fontSize: 12, marginTop: 4, textAlign: 'right' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, ...CARD_SHADOW },
+  balanceValue: { color: COLORS.white, fontSize: 26, fontWeight: '900' },
+  balanceLabel: { color: '#DCE9FC', fontSize: 12.5, marginTop: 4, textAlign: 'center', lineHeight: 19 },
+
+  card: { backgroundColor: COLORS.white, borderRadius: 12, padding: 14, marginBottom: 12, ...CARD_SHADOW },
   cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  typeText: { fontSize: 15, fontWeight: 'bold', color: '#111111' },
+  typeText: { fontSize: 15, fontWeight: 'bold', color: COLORS.black },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgeText: { fontSize: 12, fontWeight: '600' },
-  dateText: { fontSize: 13, color: '#555', textAlign: 'right' },
-  reasonText: { fontSize: 13, color: '#777', textAlign: 'right', marginTop: 6 },
-  rejectNote: { fontSize: 12, color: '#9c0c23', textAlign: 'right', marginTop: 6 },
-  empty: { textAlign: 'center', color: '#888', marginTop: 40 },
+  dateText: { fontSize: 13, color: COLORS.label, textAlign: 'right' },
+  reasonText: { fontSize: 13, color: COLORS.textMuted, textAlign: 'right', marginTop: 6 },
+  rejectNote: { fontSize: 12, color: COLORS.dangerText, textAlign: 'right', marginTop: 6 },
+
+  emptyBox: { alignItems: 'center', paddingVertical: 50, gap: 10 },
+  empty: { textAlign: 'center', color: COLORS.gray, fontSize: 14 },
 
   fab: {
-    position: 'absolute', bottom: 20, left: 20, right: 20,
-    backgroundColor: '#C8102E', padding: 16, borderRadius: 30, alignItems: 'center', elevation: 4,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6
+    position: 'absolute', left: 16, right: 16,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 15,
+    borderRadius: 16,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    elevation: 4,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10
   },
-  fabText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  fabText: { color: COLORS.white, fontWeight: '800', fontSize: 15 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'right', marginBottom: 16, color: '#111111' },
-  label: { fontSize: 13, color: '#555', textAlign: 'right', marginBottom: 6, marginTop: 10 },
-  input: {
-    backgroundColor: '#F5F7FA', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#DDD', textAlign: 'right', fontSize: 14
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,23,41,0.5)' },
+
+  modalBox: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    maxHeight: '88%'
   },
+  grabber: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#D6DBE4', alignSelf: 'center', marginBottom: 14 },
+  modalTitle: { fontSize: 18, fontWeight: '800', textAlign: 'right', marginBottom: 18, color: COLORS.black },
+
+  label: { fontSize: 12.5, fontWeight: '600', color: COLORS.label, textAlign: 'right', marginBottom: 7 },
+
+  field: {
+    backgroundColor: COLORS.white,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    paddingHorizontal: 14,
+    marginBottom: 4,
+    ...FIELD_SHADOW
+  },
+  fieldFocused: { borderColor: COLORS.primary },
+  input: { paddingVertical: 13, fontSize: 15, color: COLORS.black },
+  inputMultiline: { minHeight: 78, paddingTop: 13 },
+
   dateButton: {
-    backgroundColor: '#F5F7FA', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#DDD', alignItems: 'flex-end'
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.white,
+    borderRadius: 13,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    ...FIELD_SHADOW
   },
-  dateValueText: { fontSize: 14, color: '#111111' },
-  datePlaceholderText: { fontSize: 14, color: '#999' },
-  typeRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
-  typeChip: {
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1, borderColor: '#DDD', marginBottom: 6, marginLeft: 6
-  },
-  typeChipActive: { backgroundColor: '#C8102E', borderColor: '#C8102E' },
-  typeChipText: { fontSize: 13, color: '#555' },
-  typeChipTextActive: { color: '#fff', fontWeight: '600' },
+  dateValueText: { fontSize: 15, color: COLORS.black },
+  datePlaceholderText: { fontSize: 15, color: '#B6BDC9' },
 
-  modalActions: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginTop: 20, gap: 10 },
-  cancelBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#F5F7FA', alignItems: 'center' },
-  cancelBtnText: { color: '#555' },
-  submitBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#C8102E', alignItems: 'center' },
-  submitBtnText: { color: '#fff', fontWeight: 'bold' }
+  typeRow: { flexDirection: 'row-reverse', gap: 9, marginBottom: 16 },
+  typeChip: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: '#E2E7EF',
+    backgroundColor: COLORS.white,
+    alignItems: 'center'
+  },
+  typeChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  typeChipText: { fontSize: 13.5, color: COLORS.label, fontWeight: '600' },
+  typeChipTextActive: { color: COLORS.white, fontWeight: '700' },
+
+  modalActions: { flexDirection: 'row-reverse', marginTop: 16, gap: 10 },
+  cancelBtn: { flex: 1, paddingVertical: 15, borderRadius: 13, backgroundColor: COLORS.grayLight, alignItems: 'center' },
+  cancelBtnText: { color: COLORS.label, fontWeight: '700', fontSize: 14.5 },
+  submitBtn: { flex: 1.4, paddingVertical: 15, borderRadius: 13, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', minHeight: 50 },
+  submitBtnText: { color: COLORS.white, fontWeight: '800', fontSize: 14.5 }
 });

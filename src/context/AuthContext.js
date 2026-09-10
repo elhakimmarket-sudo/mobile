@@ -117,11 +117,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   // تسجيل الدخول بقى برقم الهاتف بدل الإيميل
-  const login = async (phone, password) => {
-    // rememberMe: true دايمًا هنا - ده تطبيق متركّب على موبايل الموظف الشخصي،
-    // مش متصفح على جهاز مشترك، فمفيش سبب يخرّجه كل أسبوع ويخليه يكتب كلمة السر تاني.
-    // السيرفر بيدّي توكن ٩٠ يوم، وإيقاف الحساب لسه بيقفله فورًا مهما كانت المدة.
-    const { data } = await api.post('/auth/login', { phone, password, rememberMe: true });
+  // rememberMe افتراضيها true: ده تطبيق متركّب على موبايل الموظف الشخصي مش متصفح على
+  // جهاز مشترك، فمفيش سبب يخرّجه كل أسبوع ويخليه يكتب كلمة السر تاني. السيرفر بيدّي
+  // توكن ٩٠ يوم، وإيقاف الحساب لسه بيقفله فورًا مهما كانت المدة.
+  const login = async (phone, password, rememberMe = true) => {
+    const { data } = await api.post('/auth/login', { phone, password, rememberMe: !!rememberMe });
     await setToken(data.token);
     await AsyncStorage.setItem('user', JSON.stringify(data));
     setUser(data);
