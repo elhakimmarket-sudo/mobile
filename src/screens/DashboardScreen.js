@@ -28,12 +28,31 @@ const statusMeta = {
   in_progress: { bg: COLORS.infoBg, text: COLORS.infoText, icon: 'ellipse-outline' }
 };
 
+// حالة الأوفر تايم بتاع اليوم. الأوفر تايم مش بيتحسب في الراتب غير بعد ما الأدمن
+// يوافق عليه، فلازم الموظف يشوف الحالة مش الساعات بس - عشان مايستناش فلوس
+// لسه محدش وافق عليها.
+const overtimeMeta = {
+  approved: { text: 'معتمد', bg: COLORS.successBg, color: COLORS.successText, icon: 'checkmark-circle-outline' },
+  pending: { text: 'مستني الموافقة', bg: COLORS.warningBg, color: COLORS.warningText, icon: 'hourglass-outline' },
+  rejected: { text: 'مرفوض', bg: COLORS.grayLight, color: COLORS.gray, icon: 'close-circle-outline' }
+};
+
+// الأوفر تايم بيتحسب بالساعة الكاملة، بس بنتعامل مع الكسور برضو تحسبًا لأي سجل قديم
+const formatOvertime = (minutes) => {
+  const m = Math.max(0, Math.round(Number(minutes) || 0));
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  if (h && rest) return `${h} س ${rest} د`;
+  if (h) return h === 1 ? 'ساعة' : (h === 2 ? 'ساعتين' : `${h} ساعات`);
+  return `${rest} دقيقة`;
+};
+
 const monthNames = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
 ];
 
-const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const dayNames =['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
 // وقت واضح بأرقام عادية (مش أرقام هندية) عشان يبقى سهل القراءة، مثلاً 08:15 ص
 const formatTime = (dateValue) => {
@@ -114,6 +133,13 @@ export default function DashboardScreen() {
   const daysPassedInMonth = Math.floor((new Date(todayStr) - new Date(effectiveStartStr)) / 86400000) + 1;
   const absentDays = Math.max(0, daysPassedInMonth - presentDays - leaveDays);
 
+  // إجمالي الأوفر تايم للشهر مفصول حسب الحالة - المعتمد هو اللي داخل الراتب فعلاً
+  const sumOvertime = (status) => records
+    .filter((r) => r.overtimeApprovalStatus === status)
+    .reduce((sum, r) => sum + (r.overtimeMinutes || 0), 0);
+  const overtimeApproved = sumOvertime('approved');
+  const overtimePending = sumOvertime('pending');
+
   return (
     <ScrollView
       style={styles.container}
@@ -165,6 +191,18 @@ export default function DashboardScreen() {
         </View>
       </View>
 
+      {(overtimeApproved > 0 || overtimePending > 0) && (
+        <View style={styles.otSummary}>
+          <Ionicons name="flash-outline" size={16} color={COLORS.primary} />
+          <Text style={styles.otSummaryText}>
+            أوفر تايم الشهر:
+            {overtimeApproved > 0 ? ` ${formatOvertime(overtimeApproved)} معتمدة` : ''}
+            {overtimeApproved > 0 && overtimePending > 0 ? ' ·' : ''}
+            {overtimePending > 0 ? ` ${formatOvertime(overtimePending)} مستنية الموافقة` : ''}
+          </Text>
+        </View>
+      )}
+
       <Text style={styles.sectionTitle}>سجل الحضور والانصراف</Text>
       {records.length === 0 && <Text style={styles.empty}>لا يوجد سجلات لهذا الشهر</Text>}
       {records.map((item) => {
@@ -201,6 +239,19 @@ export default function DashboardScreen() {
             {item.status === 'late' && item.lateMinutes > 0 && (
               <Text style={styles.lateNote}>متأخر {item.lateMinutes} دقيقة</Text>
             )}
+
+            {item.overtimeMinutes > 0 && (() => {
+              const ot = overtimeMeta[item.overtimeApprovalStatus] || overtimeMeta.pending;
+              return (
+                <View style={[styles.otRow, { backgroundColor: ot.bg }]}>
+                  <Ionicons name={ot.icon} size={14} color={ot.color} />
+                  <Text style={[styles.otHours, { color: ot.color }]}>
+                    أوفر تايم {formatOvertime(item.overtimeMinutes)}
+                  </Text>
+                  <Text style={[styles.otStatus, { color: ot.color }]}>{ot.text}</Text>
+                </View>
+              );
+            })()}
           </View>
         );
       })}
@@ -240,5 +291,20 @@ const styles = StyleSheet.create({
   timeLabel: { fontSize: 11, color: COLORS.gray, textAlign: 'right' },
   timeValue: { fontSize: 15, fontWeight: '600', color: COLORS.black, textAlign: 'right' },
   lateNote: { fontSize: 12, color: COLORS.warningText, textAlign: 'right', marginTop: 8 },
+
+  otSummary: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
+    backgroundColor: COLORS.infoBg, borderRadius: 12,
+    paddingVertical: 12, paddingHorizontal: 14, marginBottom: 20, marginTop: -8
+  },
+  otSummaryText: { flex: 1, fontSize: 13, color: COLORS.infoText, textAlign: 'right', lineHeight: 20 },
+
+  otRow: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 7,
+    borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11, marginTop: 10
+  },
+  otHours: { flex: 1, fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
+  otStatus: { fontSize: 11.5, fontWeight: '600' },
+
   empty: { textAlign: 'center', color: '#888', marginTop: 10 }
 });

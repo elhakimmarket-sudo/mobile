@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { scheduleBreakEndNotification, cancelBreakNotification } from '../services/breakNotifications';
-import { scheduleCheckOutReminder, cancelCheckOutReminder, listenForCheckOutAcknowledge } from '../services/checkoutNotifications';
+import { cancelCheckOutReminder, listenForCheckOutAcknowledge } from '../services/checkoutNotifications';
 import { COLORS, CARD_SHADOW } from '../theme/colors';
 
 // نمط الاهتزاز وقت الإنذار - بيتكرر لحد ما يتلغي يدويًا بـ Vibration.cancel()
@@ -30,8 +30,6 @@ export default function HomeScreen({ navigation }) {
 
   const intervalRef = useRef(null);
   const clockIntervalRef = useRef(null);
-  // ميعاد نهاية الوردية اللي اتجدول عليه تنبيه الانصراف - عشان مانعيدش الجدولة كل مرة الشاشة تتحدث
-  const checkoutReminderScheduledFor = useRef(null);
 
   const fetchToday = async () => {
     try {
@@ -67,19 +65,11 @@ export default function HomeScreen({ navigation }) {
 
       setToday(todayRecord || null);
 
-      // تنبيه "متنساش تسجيل الانصراف" - بيتجدول في ميعاد نهاية الوردية الرسمي، ويتلغي
-      // أول ما يسجل انصراف فعليًا
-      const officialEnd = workDayRes.data?.officialEnd;
-      if (todayRecord?.checkIn?.time && !todayRecord?.checkOut?.time && officialEnd) {
-        if (!checkoutReminderScheduledFor.current || checkoutReminderScheduledFor.current !== officialEnd) {
-          await scheduleCheckOutReminder(officialEnd);
-          checkoutReminderScheduledFor.current = officialEnd;
-        }
-      } else {
-        if (checkoutReminderScheduledFor.current) {
-          await cancelCheckOutReminder();
-          checkoutReminderScheduledFor.current = null;
-        }
+      // ⚠️ تنبيه "متنساش تسجيل الانصراف" مبقاش بيتجدول هنا - بقى بيتبعت من السيرفر
+      // (backend/utils/checkOutReminderScheduler.js) عشان يوصل لأصحاب الآيفون كمان.
+      // اللي فاضل هنا: نمسح أي تنبيه سايب في شريط الإشعارات بعد ما يسجّل انصراف.
+      if (todayRecord?.checkOut?.time) {
+        await cancelCheckOutReminder();
       }
 
       const allowedMinutes = meRes.data?.allowedBreakMinutes || 60;
@@ -155,10 +145,9 @@ export default function HomeScreen({ navigation }) {
     };
   }, []);
 
-  // لما الموظف يدوس "تمام" على تنبيه الانصراف (من جوه التنبيه نفسه)، بنوقف التكرار
+  // التعامل الحقيقي مع أزرار التنبيه بقى في App.js (عشان يشتغل والتطبيق مقفول كمان).
+  // ده مستمع فاضي محتفظين بيه لو احتجنا نعمل حاجة في الشاشة دي وقت الضغط.
   useEffect(() => {
-    // ⚠️ مانصفّرش checkoutReminderScheduledFor هنا: لو صفّرناه، fetchToday بيعيد جدولة
-    // التنبيهات فورًا ويلغي التأجيل اللي الموظف لسه طالبه. الإلغاء الحقيقي بقى في App.js.
     const unsubscribe = listenForCheckOutAcknowledge(() => {});
     return unsubscribe;
   }, []);
