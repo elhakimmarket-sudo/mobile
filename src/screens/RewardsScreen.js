@@ -10,7 +10,10 @@ export default function RewardsScreen() {
 
   const fetchData = async () => {
     try {
-      const { data } = await api.get('/penalty-reward/my');
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+      const { data } = await api.get(`/penalty-reward/my?month=${month}&year=${year}`);
       setRecords((data || []).filter((r) => r.type === 'reward'));
     } catch (error) {
       console.log('خطأ في جلب المكافآت', error.message);
