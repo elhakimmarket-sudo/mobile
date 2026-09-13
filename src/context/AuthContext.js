@@ -5,6 +5,7 @@ import api, { setForcedLogoutHandler } from '../services/api';
 import { getToken, setToken, removeToken } from '../services/secureToken';
 import { registerForPushNotifications } from '../services/pushNotifications';
 import { cancelCheckOutReminder } from '../services/checkoutNotifications';
+import { refreshOfficeConfig } from '../services/offlineQueue';
 
 const AuthContext = createContext();
 
@@ -31,6 +32,18 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (user && user.role !== 'kiosk') {
       registerForPushNotifications();
+    }
+  }, [user]);
+
+  // بنخزّن موقع المكتب على الجهاز أول ما يبقى فيه يوزر مسجّل دخول (تسجيل دخول
+  // جديد أو جلسة قديمة اترجعت) - مش لازم ننتظر الموظف يفتح شاشة تسجيل الحضور.
+  // ⚠️ ده أهم حاجة عشان التسجيل من غير نت يشتغل أصلًا: من غير القيمة دي متخزنة
+  // من قبل، مفيش طريقة نتأكد إن الموظف جوه نطاق المكتب وقت الانقطاع، فالنظام
+  // بيرفض التسجيل المحلي بالكامل (أمان مقصود مش باگ) - يعني أول مرة الموظف يفتح
+  // التطبيق وله نت لازم تحصل قبل أي محاولة تسجيل من غير نت.
+  useEffect(() => {
+    if (user && user.role !== 'kiosk') {
+      refreshOfficeConfig();
     }
   }, [user]);
 
