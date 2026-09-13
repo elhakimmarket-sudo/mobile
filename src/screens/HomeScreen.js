@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { scheduleBreakEndNotification, cancelBreakNotification } from '../services/breakNotifications';
 import { cancelCheckOutReminder, listenForCheckOutAcknowledge } from '../services/checkoutNotifications';
+import { flushQueue, refreshOfficeConfig } from '../services/offlineQueue';
 import { COLORS, CARD_SHADOW } from '../theme/colors';
 
 // نمط الاهتزاز وقت الإنذار - بيتكرر لحد ما يتلغي يدويًا بـ Vibration.cancel()
@@ -101,6 +102,11 @@ export default function HomeScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchToday();
+      // كل ما الموظف يرجع للشاشة الرئيسية (فتح التطبيق تاني، رجع من تبويب تاني...)
+      // نحاول نبعت أي تسجيل حضور/انصراف واقف في طابور الأوفلاين، ونحدّث موقع
+      // المكتب المحفوظ لو فيه نت - من غير ما نستنى الموظف يفتح شاشة الحضور بنفسه
+      flushQueue();
+      refreshOfficeConfig();
     }, [])
   );
 
