@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { enqueueAttendance, flushQueue, refreshOfficeConfig } from '../services/offlineQueue';
 
 // mode: 'check-in' أو 'check-out'
 export default function CheckInScreen({ route, navigation }) {
@@ -30,6 +31,10 @@ export default function CheckInScreen({ route, navigation }) {
 
   useEffect(() => {
     getLocation();
+    // بنحدّث إعدادات المكتب المحفوظة محليًا (لازمة عشان نتحقق من النطاق وقت الانقطاع)
+    // وبنحاول نبعت أي تسجيل قديم لسه واقف في الطابور من انقطاع سابق
+    refreshOfficeConfig();
+    flushQueue();
   }, []);
 
   const getLocation = async () => {
@@ -89,10 +94,29 @@ export default function CheckInScreen({ route, navigation }) {
       Alert.alert('تم', successMessage, [
         { text: 'حسنًا', onPress: () => navigation.goBack() }
       ]);
+
+      // لو النت رجع دلوقتي، ممكن يكون فيه تسجيل قديم لسه واقف في الطابور من انقطاع سابق
+      flushQueue();
     } catch (error) {
-      const msg = error.response?.data?.message || 'حدث خطأ، حاول مرة أخرى';
-      const detail = error.response?.data?.error;
-      Alert.alert('خطأ', detail ? `${msg}\n\nتفاصيل: ${detail}` : msg);
+      // الطلب راح للسيرفر ورجع برفض فعلي (برة النطاق، مسجل بالفعل...) - ده مش مشكلة نت،
+      // نوريه زي ما هو من غير ما نحطه في الطابور (هيترفض بنفس السبب تاني لو حاولنا نبعته تاني)
+      if (error.response) {
+        const msg = error.response.data?.message || 'حدث خطأ، حاول مرة أخرى';
+        const detail = error.response.data?.error;
+        Alert.alert('خطأ', detail ? `${msg}\n\nتفاصيل: ${detail}` : msg);
+        return;
+      }
+
+      // مفيش رد خالص من السيرفر - النت مقطوع فعليًا. نحفظ التسجيل على الجهاز
+      // ونبعته أول ما النت يرجع، بدل ما نضيّع تسجيل الموظف الحقيقي
+      const result = await enqueueAttendance({ kind: mode, lat: location.lat, lng: location.lng, photoUri: photo });
+      if (result.ok) {
+        Alert.alert('اتسجل من غير نت', result.message, [
+          { text: 'حسنًا', onPress: () => navigation.goBack() }
+        ]);
+      } else {
+        Alert.alert('تعذّر التسجيل', result.message);
+      }
     } finally {
       setLoading(false);
     }
