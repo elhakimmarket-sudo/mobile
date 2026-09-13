@@ -5,7 +5,7 @@ import api, { setForcedLogoutHandler } from '../services/api';
 import { getToken, setToken, removeToken } from '../services/secureToken';
 import { registerForPushNotifications } from '../services/pushNotifications';
 import { cancelCheckOutReminder } from '../services/checkoutNotifications';
-import { refreshOfficeConfig } from '../services/offlineQueue';
+import { refreshOfficeConfig, flushQueue } from '../services/offlineQueue';
 
 const AuthContext = createContext();
 
@@ -45,6 +45,18 @@ export const AuthProvider = ({ children }) => {
     if (user && user.role !== 'kiosk') {
       refreshOfficeConfig();
     }
+  }, [user]);
+
+  // محاولة دورية لإرسال طابور الأوفلاين طول ما فيه يوزر مسجّل دخول - مش بس
+  // لما الموظف يفتح شاشة معينة. من غيرها: لو الموظف سجّل من غير نت وقعد
+  // واقف على نفس الشاشة وشغّل النت بعدين، مفيش حاجة هتاخد بالها إن النت
+  // رجع (مفيش مكتبة لمراقبة حالة الشبكة نفسها - بنعتمد بس على إن أي محاولة
+  // إرسال بتفشل بهدوء وترجع تتحاول تاني، فبولينج بسيط كل 30 ثانية كافي
+  // وأرخص من إضافة مكتبة جديدة محتاجة بناء تطبيق جديد كامل مش مجرد تحديث).
+  useEffect(() => {
+    if (!user || user.role === 'kiosk') return;
+    const interval = setInterval(() => { flushQueue(); }, 30000);
+    return () => clearInterval(interval);
   }, [user]);
 
   // بتتنادى من شاشة تسجيل الحضور - سيبناها كدالة فاضية عشان الشاشة ماتتكسرش
