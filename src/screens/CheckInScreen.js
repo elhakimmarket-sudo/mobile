@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
-import * as FileSystem from 'expo-file-system';
+// السطر ده لازم يبقى من "legacy" - نسخة expo-file-system الحالية شالت copyAsync/
+// makeDirectoryAsync من المسار الافتراضي واستبدلتهم بكلاسات File/Directory جديدة
+import * as FileSystem from 'expo-file-system/legacy';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../context/AuthContext';

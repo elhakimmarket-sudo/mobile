@@ -8,7 +8,9 @@
 // الصورة بتتخزن كملف على الجهاز (مش base64 في AsyncStorage) عشان متملاش التخزين.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+// السطر ده لازم يبقى من "legacy" - نسخة expo-file-system الحالية شالت copyAsync/
+// makeDirectoryAsync/deleteAsync من المسار الافتراضي واستبدلتهم بكلاسات File/Directory جديدة
+import * as FileSystem from 'expo-file-system/legacy';
 import api from './api';
 import { readCache, writeCache } from './cache';
 
