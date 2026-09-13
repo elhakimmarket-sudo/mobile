@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { scheduleBreakEndNotification, cancelBreakNotification } from '../services/breakNotifications';
 import { cancelCheckOutReminder, listenForCheckOutAcknowledge } from '../services/checkoutNotifications';
-import { flushQueue, refreshOfficeConfig } from '../services/offlineQueue';
+import { flushQueue, refreshOfficeConfig, onQueueFlushed } from '../services/offlineQueue';
 import { COLORS, CARD_SHADOW } from '../theme/colors';
 
 // نمط الاهتزاز وقت الإنذار - بيتكرر لحد ما يتلغي يدويًا بـ Vibration.cancel()
@@ -98,6 +98,16 @@ export default function HomeScreen({ navigation }) {
       console.log('خطأ في جلب بيانات اليوم', error.message);
     }
   };
+
+  // لو تسجيل حضور/انصراف واقف في الطابور اتبعت بنجاح - حتى لو حصل في الخلفية
+  // (البولينج الدوري في AuthContext مثلاً وإحنا واقفين على نفس الشاشة) - نحدّث
+  // الشاشة فورًا بدل ما تفضل واقفة على "تسجيل حضور" رغم إن التسجيل وصل السيرفر فعليًا
+  useEffect(() => {
+    const unsubscribe = onQueueFlushed((result) => {
+      if (result.sent > 0) fetchToday();
+    });
+    return unsubscribe;
+  }, []);
 
   useFocusEffect(
     useCallback(() => {

@@ -119,6 +119,20 @@ export async function enqueueAttendance({ kind, lat, lng, photoUri }) {
   return { ok: true, message: 'اتسجل على الجهاز - هيتبعت أول ما النت يرجع', queued: items.length };
 }
 
+// ---------- إشعار الشاشات لما تسجيل من الطابور ينجح يتبعت ----------
+// الشاشة الرئيسية بتاخد "أنت حاضر ولا لأ" من السيرفر، وده معناه إنها مش
+// بتتحدث تلقائي لمجرد إن الإرسال حصل في الخلفية (البولينج الدوري في
+// AuthContext مثلاً) - المستمعين هنا بيسمحوا لأي شاشة تعرف اللحظة دي
+// وتعيد تحميل بياناتها من غير ما نربط الملف ده بأي شاشة بعينها
+const flushListeners = new Set();
+export function onQueueFlushed(callback) {
+  flushListeners.add(callback);
+  return () => flushListeners.delete(callback);
+}
+const notifyFlushListeners = (result) => {
+  flushListeners.forEach((cb) => { try { cb(result); } catch (e) {} });
+};
+
 /**
  * بتحاول تبعت كل اللي في الطابور بالترتيب. آمنة تتنادى كذا مرة.
  * بتقف عند أول فشل شبكة عشان تحافظ على ترتيب الحضور قبل الانصراف.
@@ -163,5 +177,7 @@ export async function flushQueue() {
     }
   }
 
-  return { sent, failed, remaining: items.length };
+  const result = { sent, failed, remaining: items.length };
+  if (sent > 0) notifyFlushListeners(result);
+  return result;
 }
