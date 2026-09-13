@@ -99,7 +99,7 @@ export async function enqueueAttendance({ kind, lat, lng, photoUri }) {
   try {
     await FileSystem.copyAsync({ from: photoUri, to: savedPhoto });
   } catch (e) {
-    return { ok: false, message: 'تعذّر حفظ الصورة على الجهاز' };
+    return { ok: false, message: `تعذّر حفظ الصورة على الجهاز${e?.message ? `\n(${e.message})` : ''}` };
   }
 
   const items = await readQueue();

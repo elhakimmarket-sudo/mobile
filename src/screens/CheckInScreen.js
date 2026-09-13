@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
+import * as FileSystem from 'expo-file-system';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../context/AuthContext';
@@ -53,7 +54,20 @@ export default function CheckInScreen({ route, navigation }) {
   const takePhoto = async () => {
     if (!cameraRef.current) return;
     const result = await cameraRef.current.takePictureAsync({ quality: 0.5 });
-    setPhoto(result.uri);
+
+    // بننسخ الصورة فورًا من مجلد الكاميرا المؤقت لمجلد دائم بتاع التطبيق.
+    // ليه فورًا مش وقت الحفظ في طابور الأوفلاين بس: لو النت بطيء وبيحاول
+    // ويفشل بعد شوية ثواني (مش فشل فوري)، الملف المؤقت ممكن يتمسح في الفترة
+    // دي والنسخ يفشل بعدها بـ "تعذّر حفظ الصورة على الجهاز" من غير أي داعي.
+    try {
+      const dir = FileSystem.documentDirectory + 'attendance-photos/';
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {});
+      const permanentUri = dir + `${Date.now()}.jpg`;
+      await FileSystem.copyAsync({ from: result.uri, to: permanentUri });
+      setPhoto(permanentUri);
+    } catch (e) {
+      setPhoto(result.uri); // فشل النسخ لأي سبب - نجرب بالمسار الأصلي بدل ما نوقف الموظف تمامًا
+    }
   };
 
   const retake = () => setPhoto(null);
