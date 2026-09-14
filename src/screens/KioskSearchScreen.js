@@ -8,9 +8,11 @@ export default function KioskSearchScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState('');
 
   const handleSearch = async (text) => {
     setQuery(text);
+    setErrorText('');
     if (!text || text.trim().length < 1) {
       setResults([]);
       return;
@@ -21,6 +23,13 @@ export default function KioskSearchScreen({ navigation }) {
       setResults(data);
     } catch (e) {
       setResults([]);
+      // ⚠️ من غير كده أي عطل حقيقي (توكن الكيوسك بايظ، السيرفر واقع...) كان بيبان
+      // بالظبط زي "مفيش نتايج" - محدش هيعرف إن السبب مش إن الاسم غلط
+      setErrorText(
+        !e.response
+          ? 'مفيش اتصال بالسيرفر. اتأكد من النت وحاول تاني'
+          : 'حصل خطأ من السيرفر. لو المشكلة استمرت اخرج من وضع المكتب وسجل دخول تاني'
+      );
     } finally {
       setLoading(false);
     }
@@ -37,6 +46,7 @@ export default function KioskSearchScreen({ navigation }) {
         autoFocus
       />
       {loading && <ActivityIndicator style={{ marginTop: 20 }} size="large" color="#2F80ED" />}
+      {!!errorText && <Text style={styles.errorText}>{errorText}</Text>}
       <FlatList
         data={results}
         keyExtractor={(item) => item._id}
@@ -70,5 +80,6 @@ const styles = StyleSheet.create({
   },
   resultName: { fontSize: 17, fontWeight: 'bold', color: '#111111', textAlign: 'right' },
   resultMeta: { fontSize: 13, color: '#777', textAlign: 'right', marginTop: 2 },
-  emptyText: { textAlign: 'center', color: '#999', marginTop: 30 }
+  emptyText: { textAlign: 'center', color: '#999', marginTop: 30 },
+  errorText: { textAlign: 'center', color: '#c0392b', marginTop: 16, fontSize: 13 }
 });
