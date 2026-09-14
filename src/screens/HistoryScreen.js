@@ -11,6 +11,14 @@ const statusLabels = {
   in_progress: '🔵 جاري العمل'
 };
 
+// يوم الإجازة بيوضح كمان مدفوعة ولا لأ
+const attendanceStatusLabel = (item) => {
+  if (item.status === 'on_leave') {
+    return item.leaveType === 'unpaid' ? '🌴 إجازة غير مدفوعة' : '🌴 إجازة مدفوعة';
+  }
+  return statusLabels[item.status] || item.status;
+};
+
 export default function HistoryScreen() {
   const [records, setRecords] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,7 +50,7 @@ export default function HistoryScreen() {
   const renderItem = ({ item }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Text style={styles.status}>{statusLabels[item.status] || item.status}</Text>
+        <Text style={styles.status}>{attendanceStatusLabel(item)}</Text>
         <Text style={styles.date}>{item.date}</Text>
       </View>
       <Text style={styles.row}>

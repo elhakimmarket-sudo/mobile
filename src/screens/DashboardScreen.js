@@ -20,6 +20,14 @@ const statusLabels = {
   in_progress: 'جاري العمل'
 };
 
+// يوم الإجازة بيوضح كمان مدفوعة ولا لأ - غير كده مفيش فرق واضح بين النوعين في السجل
+const attendanceStatusLabel = (item) => {
+  if (item.status === 'on_leave') {
+    return item.leaveType === 'unpaid' ? 'إجازة غير مدفوعة' : 'إجازة مدفوعة';
+  }
+  return statusLabels[item.status] || item.status;
+};
+
 const statusMeta = {
   present: { bg: COLORS.successBg, text: COLORS.successText, icon: 'checkmark-circle-outline' },
   late: { bg: COLORS.warningBg, text: COLORS.warningText, icon: 'time-outline' },
@@ -213,7 +221,7 @@ export default function DashboardScreen() {
               <View style={[styles.statusPill, { backgroundColor: meta.bg }]}>
                 <Ionicons name={meta.icon} size={12} color={meta.text} />
                 <Text style={[styles.statusPillText, { color: meta.text }]}>
-                  {statusLabels[item.status] || item.status}
+                  {attendanceStatusLabel(item)}
                 </Text>
               </View>
               <Text style={styles.date}>{formatFriendlyDate(item.date)}</Text>
